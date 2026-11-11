@@ -1027,6 +1027,12 @@ function sessionAdapter() {
       // act, town level, map seed -- comes out of it (PLRSAVE2_ReadSaveHeader, client-parity C3e).
       // Returns 0, or the PLRSAVE2 error code that refused the file.
       createFromSave(bytes, difficulty) {
+        // A browser reload resets the engine's local-client join flags. Saved
+        // characters need the same room/unit publication as a new character;
+        // otherwise the server loads NPCs but sends none to the packet client.
+        Module.ccall('d2_session_create_stream', 'number', ['number'], [0]);
+        Module.ccall('d2_session_join_units', null, ['number'], [1]);
+        Module.ccall('d2_session_join_reveal', null, ['number'], [JOIN_REVEAL]);
         const p = Module._malloc(bytes.length);
         try {
           Module.HEAPU8.set(bytes, Number(p));
@@ -5438,6 +5444,16 @@ function drawFrame() {
       difficulty: snapshot.difficulty ?? 0, act: snapshot.act,
       goldLost: snapOr('goldLost', () => view.playerStat(175)) });
   } else deathScreenEvidence = null;
+  // Local single-player also uses the packet client. Its speech screen renders text,
+  // but the old voice hook only ran while reading the direct-engine NPC dialog.
+  // Feed the same voice player from the live packet speech, once per message; only
+  // stop an NPC-owned voice on close so object/quest narration is not interrupted.
+  if (view.fromPackets) {
+    const npc = realmNpc().isOpen() ? realmNpc().view() : null;
+    if (npc?.mode === 'speech' && npc.speech?.stringId != null)
+      syncNpcDialogueVoice({ npcId: npc.guid, spoken: npc.speech.stringId });
+    else if (npcVoiceKey !== null) syncNpcDialogueVoice(null);
+  }
   // The NPC's menu hangs over their head until an entry is picked.
   npcMenuEvidence = null;
   if (view.npcOpen()) {   // online: the realm NPC's menu, speech or shop (inert offline)
