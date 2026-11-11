@@ -5438,6 +5438,16 @@ function drawFrame() {
       difficulty: snapshot.difficulty ?? 0, act: snapshot.act,
       goldLost: snapOr('goldLost', () => view.playerStat(175)) });
   } else deathScreenEvidence = null;
+  // Local single-player also uses the packet client. Its speech screen renders text,
+  // but the old voice hook only ran while reading the direct-engine NPC dialog.
+  // Feed the same voice player from the live packet speech, once per message; only
+  // stop an NPC-owned voice on close so object/quest narration is not interrupted.
+  if (view.fromPackets) {
+    const npc = realmNpc().isOpen() ? realmNpc().view() : null;
+    if (npc?.mode === 'speech' && npc.speech?.stringId != null)
+      syncNpcDialogueVoice({ npcId: npc.guid, spoken: npc.speech.stringId });
+    else if (npcVoiceKey !== null) syncNpcDialogueVoice(null);
+  }
   // The NPC's menu hangs over their head until an entry is picked.
   npcMenuEvidence = null;
   if (view.npcOpen()) {   // online: the realm NPC's menu, speech or shop (inert offline)

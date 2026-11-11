@@ -14,10 +14,9 @@
 //
 // The palette is the ACT's, the one the world this menu overlays is drawn with: retail renders the
 // whole in-game screen in one palette, and the frame's own colours are what it must match.
-// Declared: SOUND OPTIONS is drawn dimmed (retail's DrawMode 1), because retail's own capture of
-// this page (`retail/frames/options-menu.png`, `opt-options-page.txt`) runs with sound off (`-ns`)
-// and this client has no D2 sound device either. `opt-options-page-sound-on.txt` is the mode-5
-// variant a build with a sound device draws (client-parity F215).
+// The native capture used -ns, which dimmed SOUND OPTIONS. The browser has a
+// Web Audio output device, so keep this row enabled instead of inheriting the
+// capture machine's disabled-device state.
 //
 // F215/F216: the SOUND OPTIONS and VIDEO OPTIONS pages themselves live in `options-pages.mjs`
 // (its own row table and renderer), opened from two of the OPTIONS lines below.
@@ -48,7 +47,7 @@ export const ESC_MENU_ROWS = Object.freeze([
   { label: 'RETURN TO GAME', anchorY: 324, cels: [['returntogame', 0, 221, 324], ['returntogame', 1, 477, 324]] },
 ]);
 export const OPTIONS_PAGE_ROWS = Object.freeze([
-  { label: 'SOUND OPTIONS', anchorY: 174, dim: true, cels: [['soundoptions', 0, 245, 174], ['soundoptions', 1, 501, 174]] },
+  { label: 'SOUND OPTIONS', anchorY: 174, dim: false, cels: [['soundoptions', 0, 245, 174], ['soundoptions', 1, 501, 174]] },
   { label: 'VIDEO OPTIONS', anchorY: 224, cels: [['videooptions', 0, 252, 224], ['videooptions', 1, 508, 224]] },
   { label: 'AUTOMAP OPTIONS', anchorY: 274, cels: [['automapoptions', 0, 210, 274], ['automapoptions', 1, 466, 274]] },
   { label: 'CONFIGURE CONTROLS', anchorY: 324, cels: [['cfgoptions', 0, 188, 324], ['cfgoptions', 1, 444, 324]] },
