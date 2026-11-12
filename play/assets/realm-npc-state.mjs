@@ -8,6 +8,7 @@
 // conversation opens, ahead of any speech, for the four mercenary hirers (not when the player picks Hire); the server answers 0x4F then one 0x4E per offer, which the hire window lists.
 import { npcMenuEntries, talkEntries, entriesAfterSpeech, withTravelRow, withHireRow, withResurrectRow, TRAVEL_LEVEL } from './npc-menu.mjs';
 import { npcPackets, NPC_ACTION, SELL_MODE, parseNpcInfo, parseTransaction, parseShopItem, parseHireOffer, HIRE_LIST_HEAD } from './realm-npc-packets.mjs';
+import { talkSpeechId } from './npc-topics.mjs';
 import { decodeItemHeader } from './realm-world.mjs';
 import { packets, UNIT } from './realm-input.mjs';
 import { refusalString, hireRefusalString } from './vendor-repair-confirm.mjs';
@@ -29,9 +30,11 @@ export const chatEnd = (guid) => packets.npcChatEnd(UNIT.MONSTER, guid);
  * the hero's unit id for the hire form of the 0x38 request (trade and gamble carry 0); questBit(word) is bit 0 of
  * the hero's quest word and expansion() the game's expansion flag (the travel rows' conditions).
  */
-export function createRealmNpc({ send, classOf = () => -1, questDone = () => false, questName = () => '',
+export function createRealmNpc({ send, classOf = () => -1, questDone = () => false, questName = () => '', speechOf = () => null,
   resurrectLabel = () => null, transactionCost = () => null, hireStats = () => null, playerGuid = () => 0xffffffff,
   questBit = () => false, expansion = () => true } = {}) {
+  let speechSerial = 0;
+  const introHeard = new Map();
   let npc = null;            // { guid, classId, messages, entries, speech, spoken, mode, offers }
   let stock = new Map();     // item guid -> { guid, bits, tab, x, y }
   let result = null;         // the last transaction outcome
@@ -71,7 +74,8 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
     const speech = messages.filter((m) => m.menu === MENU_SPEECH);
     const entries = menuFor(classId);
     if (!entries && !speech.length) return;   // neither a menu nor a line: nothing to open
-    npc = { guid: info.guid, classId, messages, entries, speech, spoken: 0, mode: 'speech', offers: [] };
+    if (speech[0]) introHeard.set(classId, speech[0].stringId);
+    npc = { guid: info.guid, classId, messages, entries, speech, spoken: 0, mode: 'speech', offers: [], speechInstance: ++speechSerial };
     stock = new Map();
     send(chatStart(info.guid));
     // Retail's conversation open builds the menu at once (before any line is played), and the build asks the
@@ -137,7 +141,7 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
     /** What the shell draws: null when no NPC is open. */
     view() {
       if (!npc) return null;
-      return { guid: npc.guid, classId: npc.classId, mode: npc.mode, entries: npc.entries, speech: npc.speech[npc.spoken] ?? null,
+      return { guid: npc.guid, classId: npc.classId, mode: npc.mode, entries: npc.entries, speech: npc.localSpeech ?? npc.speech[npc.spoken] ?? null, speechInstance: npc.speechInstance,
         stock: [...stock.values()], offers: npc.offers, result, sellMode, repairMode, refusal };
     },
     isOpen: () => npc !== null,
@@ -145,9 +149,22 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
     /** The player dismissed the current speech: the server is told which line it was (0x31), then the menu returns. */
     dismissSpeech() {
       if (!npc || npc.mode !== 'speech') return false;
+      // Talk's own lines return to the Talk list. Only an offered quest topic
+      // sends completion, and only after the player actually heard/dismissed it.
+      if (npc.localSpeech) {
+        const state = npc, line = state.localSpeech, back = state.speechReturn;
+        state.localSpeech = null; state.speechReturn = null;
+        state.mode = back.mode;
+        state.entries = line.acknowledge ? entriesAfterSpeech(back.entries, line.stringId) : back.entries;
+        if (line.acknowledge) {
+          state.messages = state.messages.filter(m => m.stringId !== line.stringId);
+          send(npcPackets.messageDone(state.guid, line.stringId));
+        }
+        return true;
+      }
       const line = npc.speech[npc.spoken];
       if (line) send(npcPackets.messageDone(npc.guid, line.stringId));
-      npc.spoken++;
+      npc.spoken++; npc.speechInstance = ++speechSerial;
       if (npc.spoken >= npc.speech.length) {
         if (npc.entries) openMenu(); else close(true);
       }
@@ -158,9 +175,18 @@ export function createRealmNpc({ send, classOf = () => -1, questDone = () => fal
       if (!npc || (npc.mode !== 'menu' && npc.mode !== 'talk')) return false;
       switch (entry.action) {
         case 'talk': npc.entries = talkEntries(npc.messages, questName); npc.mode = 'talk'; return true;
-        case 'topic': send(npcPackets.messageDone(npc.guid, entry.stringId));
-          npc.entries = entriesAfterSpeech(npc.entries, entry.stringId); return true;
-        case 'intro': case 'gossip': return true;   // the line is played by the shell; nothing goes to the server
+        case 'topic': case 'intro': case 'gossip': {
+          // Reuse the existing single-player topic selection rules, including
+          // introduction ID zero and the actual class-specific greeting heard.
+          const id = talkSpeechId(entry.action, { stringId: entry.stringId,
+            plain: npc.messages.find(m => m.menu === MENU_SPEECH)?.stringId,
+            said: introHeard.get(npc.classId), sp: speechOf(npc.classId) });
+          if (id == null) { close(true); return true; }
+          npc.speechReturn = { mode: npc.mode, entries: npc.entries };
+          npc.localSpeech = { stringId: id, acknowledge: entry.action === 'topic' };
+          npc.speechInstance = ++speechSerial; npc.mode = 'speech';
+          return true;
+        }
         case 'trade': npc.mode = 'trade'; send(npcPackets.request(NPC_ACTION.TRADE, npc.guid, 0)); return true;
         case 'gamble': npc.mode = 'gamble'; send(npcPackets.request(NPC_ACTION.GAMBLE, npc.guid, 0)); return true;
         // The hire window lists the offers received at menu build (0x38 sent then): choosing Hire sends nothing.

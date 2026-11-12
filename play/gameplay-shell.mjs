@@ -71,7 +71,6 @@ import { withinNativeWarpInteractionRange } from './assets/warp-interaction.mjs'
 import { decodeWalkProbe } from './assets/walk-command-trace.mjs';
 import { hudOrigin } from './assets/hud-origin.mjs';
 import { chromeGates } from './assets/scene-chrome.mjs';
-import { exitLocalGame } from './assets/realm-local.mjs';
 import { realmViewSnapshot, realmFrameReads, realmGameReads } from './assets/realm-client-view.mjs';
 import { createRealmHud, waypointTravelPacket, waypointActCompletion } from './assets/realm-hud-state.mjs';
 import { createExperienceTable, createWaypointTable, createSkillTable } from './assets/realm-hud-tables.mjs';
@@ -1672,6 +1671,10 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   eventSounds?.resetObjects?.();
   realmLoadOrder.reset();
   realmWorldState?.reset(); realmNpcState = null;
+  // The screen's UI wrapper closes over this NPC state. A continued local game
+  // must not send its menu choices to the previous session's conversation.
+  if (realmNpcScreenState) { npcMenu?.close(); npcMenu?.closeHire(); }
+  realmNpcScreenState = null; realmShopShown = false;
   realmHudState?.reset();
   realmMonsterViews = [];
   realmMissileViews = [];
@@ -2759,7 +2762,7 @@ function syncNpcDialogueVoice(state) {
   const clickKey = `${state.npcId}:${messageId}`;
   if (clickKey !== npcSpeechClickKey) { npcSpeechClickKey = clickKey; npcSpeechClickGate.begin(performance.now()); }
   const audioEnabled = npcSpeechHasAudio(npcSpeechSetting.mode);
-  const key = `${state.npcId}:${messageId}:${audioEnabled ? 1 : 0}`;
+  const key = `${state.npcId}:${messageId}:${audioEnabled ? 1 : 0}:${state.messageInstance ?? ''}`;
   if (key === npcVoiceKey && unitSounds) return;
   npcVoiceKey = key;
   const source = npcDialogueVoiceSource(messageId);
@@ -4320,12 +4323,19 @@ function realmTables() {
 }
 // The town NPC's conversation and shop in a joined game (assets/realm-npc-state.mjs).
 let realmNpcState = null, realmQuestWords = null;   // realmQuestWords: the hero's 96 quest-flag bytes of the last 0x28
+// The same engine-localized NPC name feeds menu headings and existing speech lookup.
+function realmNpcClassName(classId) {
+  const id = Module.ccall('d2_monster_name_str', 'number', ['number'], [classId]);
+  return id >= 0 ? Module.ccall('d2_lang_string_by_index', 'string', ['number'], [id]) : '';
+}
 function realmNpc() {
   return (realmNpcState ??= createRealmNpc({
     send: (bytes) => (realmFlow?.d2gs?.isOpen ? realmFlow.d2gs.send(bytes) : false),
     classOf: (guid) => realmSceneEvidence?.monsters?.find((m) => m.guid === guid)?.classId ?? -1,
     // The boat and Hire rows depend on the hero's quests, read from the quest flags the server sent with its NPC packet.
     questDone: (act, quest) => realmQuestWords !== null && questStatus(realmQuestWords, act, quest) === 'done',
+    questName: (act, quest) => Module.ccall('d2_lang_string', 'string', ['string'], [`qstsa${act}q${quest}`]),
+    speechOf: (classId) => npcSpeech(classId) || npcSpeechByName(realmNpcClassName(classId), snapshot?.act ?? 1),
     // The Resurrect row is on offer while the server's 0x9B names a dead mercenary: sprintf(string 0x58A8, its name string, the price).
     resurrectLabel: () => {
       const o = realmFlow?.protocol?.d2gsClientMercResurrect?.();
@@ -4362,6 +4372,7 @@ function realmNpcScreen() {
     itemNameOf: (guid) => { const it = realmNpc().view()?.stock.find((x) => x.guid === guid); return it ? (realmItemTextFor().describe(it.bits)?.name ?? '') : ''; },
     anchor: realmNpcFeet, smith: (classId) => SMITH_CLASSES.has(classId), gold: () => realmWorldState?.gold ?? null,
     now: () => Math.trunc(performance.now()),
+    nameOf: realmNpcClassName, speechReady: () => npcSpeechScrollGate.ready,
     offerClick: Module._d2_client_store_offer_click ? storeOfferClick : null,
     // the same offer fields the local window's stock carries: tooltip text, price label and price, and the stash line
     itemDetail: (s) => ({ ...(realmItemTextFor().describe(s.bits) ?? {}), cost: realmNpc().priceOf(s.guid) ?? 0, costLabel: Module.ccall('d2_lang_string_by_index', 'string', ['number'], [3329]) }),
@@ -4589,9 +4600,24 @@ const realmClientView = {
     available: () => Boolean(session) || realmTransport.state === 'session-open',
     saveAndExit() {
       // A Battle.net game: the server holds the character. Retail returns to the lobby.
+      // Save the live local character before release clears session/snapshot.
+      // Keep both the game and its menu available if persistence fails.
+      if (realmFlow?.local) {
+        const nativeSession = session;
+        void saveBeforeExit(async () => {
+          const saved = await persistCurrentCharacter();
+          if (!saved) { gameMenuError = lastSaveError || 'Unable to save the current character'; return null; }
+          return saved;
+        }, async () => {
+          gameMenu.close();
+          await releaseRealmFlow({ closeTransports: true });
+          session = nativeSession;   // release detaches the view; leave still owns engine teardown
+          leaveGame();
+          await enterCharacterSelect();
+        }).catch((error) => { gameMenuError = String(error); });
+        return;
+      }
       gameMenu.close();
-      // A local game has no lobby or game server to wait on: the character is written and the list comes back, as in single player.
-      if (realmFlow?.local) { void exitLocalGame({ release: () => releaseRealmFlow({ closeTransports: true }), saveAndExit: () => spClientView.commands.saveAndExit() }); return; }
       // Retail's exit row sends the window close, and the close handler sends 0x69 at once; the 4F 02 / 30 s wait belongs
       // to the trade window's cancel button. A reason countdown already running tears down at once.
       if (!realmFlow?.d2gsLife?.saveAndExit()) void leaveRealmGame();
@@ -5451,7 +5477,7 @@ function drawFrame() {
   if (view.fromPackets) {
     const npc = realmNpc().isOpen() ? realmNpc().view() : null;
     if (npc?.mode === 'speech' && npc.speech?.stringId != null)
-      syncNpcDialogueVoice({ npcId: npc.guid, spoken: npc.speech.stringId });
+      syncNpcDialogueVoice({ npcId: npc.guid, spoken: npc.speech.stringId, messageInstance: npc.speechInstance });
     else if (npcVoiceKey !== null) syncNpcDialogueVoice(null);
   }
   // The NPC's menu hangs over their head until an entry is picked.
@@ -5460,7 +5486,12 @@ function drawFrame() {
     const screenForNpc = realmNpcScreen();
     if (screenForNpc) { screenForNpc.checkScene(realmSceneEvidence?.monsters ?? []); screenForNpc.draw(ctx, w, h, { act: snapshot.act, pointer });
       if (realmNpc().shopOpen() && !realmShopShown) { inventoryVisible = true; realmShopShown = true; } }
-  } else realmShopShown = false;
+  } else {
+    // Ending a packet conversation must also clear its shared menu renderer;
+    // otherwise its stale popup intercepts the next NPC/world click as legacy UI.
+    if (view.fromPackets) realmNpcScreenState?.draw(ctx, w, h, { act: snapshot.act, pointer });
+    realmShopShown = false;
+  }
   if (npcMenu?.open) {
     const npc = snapshot.entities.find((u) => u.id === npcMenu.state.npcId && u.type === 1);
     if (npc) { const cam = worldToScreen(cameraGrid().x, cameraGrid().y), pt = worldToScreen(npc.x, npc.y);

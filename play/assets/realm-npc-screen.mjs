@@ -34,7 +34,7 @@ const menuOffer = (o) => ({ mercName: o.mercName, name: o.name, level: o.level ?
  */
 export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor, speech, itemTable, text = () => '', anchor = () => null,
   smith = () => false, now = () => 0, nameOf = () => '', itemNameOf = () => '', gold = () => null, offerClick = null,
-  itemDetail = null, stashGold = () => -1 }) {
+  itemDetail = null, stashGold = () => -1, speechReady = () => true }) {
   const gate = createNpcSpeechClickGate();   // the per-speech 100 ms mouse-down gate
   const rule = offerClick ?? fallbackOfferClick(now);
   let gateKey = null;
@@ -100,10 +100,16 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
       if (!v || (v.mode !== 'trade' && v.mode !== 'gamble')) vendorState = null;
       if (!v) { syncMenu(null); vendorOpenFor = null; if (hireKey !== null) { menu.closeHire(); hireKey = null; } return null; }
       if (v.mode === 'speech') {
-        const key = `${v.guid}:${v.speech?.stringId}`;
+        syncMenu(null);   // The old Talk list must not remain clickable over its speech.
+        const key = `${v.guid}:${v.speech?.stringId}:${v.speechInstance ?? ''}`;
         if (key !== gateKey) { gateKey = key; gate.begin(now()); }
         const line = v.speech ? text(v.speech.stringId) : '';
-        return speech.draw(ctx, line, undefined, { messageInstance: v.guid });
+        if (!speechReady()) return null;
+        const drawn = speech.draw(ctx, line, undefined, { messageInstance: key });
+        // Use the shared speech clock's completion, just as the direct-engine
+        // conversation does; otherwise the fully scrolled box stays empty forever.
+        if (drawn?.done) { gateKey = null; ui.dismissSpeech(); }
+        return drawn;
       }
       if (v.mode === 'hire') {
         syncMenu(null);

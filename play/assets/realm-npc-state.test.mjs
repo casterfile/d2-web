@@ -250,3 +250,38 @@ test('a hire refusal raises the box and Continue ends the conversation (D2Client
   r = fresh({ classId: 198 }); r.npc.handle(info(GUID, [])); r.npc.choose({ action: 'hire' });
   reply(r, 8); assert.equal(r.npc.view().refusal, 0);                        // no hire waiting (0xBC9663 != 10)
 });
+
+// A complete Talk cycle must open speech and return without acknowledging
+// client-only Introduction/Gossip rows as server quest messages.
+test('Talk introduction preserves message zero and Gossip opens its resolved speech', () => {
+  const { npc, sent } = fresh({ classId: 155, speechOf: () => ({ intro: 0, gossip: 6 }) });
+  npc.handle(info(GUID, [[0, 0]])); npc.dismissSpeech();
+  npc.choose({ action: 'talk' }); const before = sent.length;
+  assert.equal(npc.choose({ action: 'intro' }), true);
+  assert.equal(npc.view().mode, 'speech');
+  assert.equal(npc.view().speech.stringId, 0);
+  const instance = npc.view().speechInstance;
+  assert.equal(npc.dismissSpeech(), true);
+  assert.equal(npc.view().mode, 'talk');
+  assert.equal(sent.length, before);
+  npc.choose({ action: 'gossip' });
+  assert.equal(npc.view().speech.stringId, 6);
+  assert.notEqual(npc.view().speechInstance, instance);
+  npc.dismissSpeech(); assert.equal(npc.view().mode, 'talk');
+  npc.choose({ action: 'cancel' }); assert.equal(npc.isOpen(), false);
+});
+test('a Talk quest topic is spoken before its single completion acknowledgement', () => {
+  const { npc, sent } = fresh({ classId: 148, questName: () => 'Den of Evil' });
+  npc.handle(info(GUID, [[2, 64]])); npc.choose({ action: 'talk' });
+  const topic = npc.view().entries.find(e => e.action === 'topic');
+  assert.ok(topic); const before = sent.length;
+  npc.choose(topic);
+  assert.equal(npc.view().mode, 'speech');
+  assert.equal(npc.view().speech.stringId, 64);
+  assert.equal(sent.length, before);
+  npc.dismissSpeech();
+  assert.equal(npc.view().mode, 'talk');
+  assert.equal(sent.length, before + 1);
+  assert.equal(sent.at(-1)[0], 0x31);
+  assert.equal(npc.view().entries.some(e => e.action === 'topic'), false);
+});

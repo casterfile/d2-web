@@ -5,7 +5,7 @@ import { createRealmNpcScreen } from './realm-npc-screen.mjs';
 const ROW_A = { action: 'talk', stringId: 1 }, ROW_B = { action: 'trade', stringId: 2 };
 
 const clock = { t: 0 };
-function fakes(viewValue, { buyConfirm = null, offerClick = null, gold = () => null, price = () => 450 } = {}) {
+function fakes(viewValue, { buyConfirm = null, offerClick = null, gold = () => null, price = () => 450, speechReady = () => true, speechResult = () => true } = {}) {
   const calls = [];
   let v = viewValue;
   const menu = {
@@ -28,7 +28,7 @@ function fakes(viewValue, { buyConfirm = null, offerClick = null, gold = () => n
     buttonAt: (x) => (x === 100 ? 'sell' : x === 101 ? 'repairAll' : null),
     itemAt: (x) => (x === 200 ? { guid: 0x77 } : null),
   };
-  const speech = { draw(_ctx, text) { calls.push(['speech.draw', text]); return true; } };
+  const speech = { draw(_ctx, text, _box, options) { calls.push(['speech.draw', text]); return speechResult(options); } };
   const ui = {
     choose: (e) => { calls.push(['choose', e.action]); return true; },
     dismissSpeech: () => { calls.push(['dismiss']); return true; },
@@ -43,7 +43,7 @@ function fakes(viewValue, { buyConfirm = null, offerClick = null, gold = () => n
     walkedAway: (g, monsters) => { calls.push(['walked', g, monsters.length]); return false; },
   };
   const screen = createRealmNpcScreen({ ui, view: () => v, menu, buyConfirm, vendor, speech, itemTable: {}, text: (id) => `line${id}`, now: () => clock.t, nameOf: () => 'Akara',
-    anchor: () => ({ x: 300, y: 400 }), gold: () => gold(), offerClick });
+    anchor: () => ({ x: 300, y: 400 }), gold: () => gold(), offerClick, speechReady });
   return { screen, calls, menu, setView: (nv) => { v = nv; } };
 }
 
@@ -293,4 +293,27 @@ test('hire: a refusal opens the red box over Continue and Continue dismisses it 
   assert.equal(calls.some((c) => c[0] === 'hire'), false);
   assert.equal(screen.pointerDown(320, 10, 800, 600, 0), true);
   assert.equal(calls.filter((c) => c[0] === 'dismissRefusal').length, 1);
+});
+
+// The visible speech lifecycle must complete, not leave a blank scrolled box.
+test('speech waits for voice readiness, hides the Talk menu and completes once', () => {
+  let ready = false;
+  const f = fakes(menuView, { speechReady: () => ready, speechResult: () => ({ done: true }) });
+  f.screen.draw({}, 800, 600); assert.equal(f.menu.open, true);
+  f.setView({ ...menuView, mode: 'speech', speech: { stringId: 7 }, speechInstance: 1 });
+  assert.equal(f.screen.draw({}, 800, 600), null);
+  assert.equal(f.menu.open, false);
+  assert.equal(f.calls.some(c => c[0] === 'speech.draw'), false);
+  ready = true; f.screen.draw({}, 800, 600);
+  assert.equal(f.calls.filter(c => c[0] === 'dismiss').length, 1);
+  f.setView(menuView); f.screen.draw({}, 800, 600);
+  assert.equal(f.calls.filter(c => c[0] === 'dismiss').length, 1);
+});
+test('replaying the same speech ID receives a fresh text-clock identity', () => {
+  const speech = { ...menuView, mode: 'speech', speech: { stringId: 0 }, speechInstance: 1 };
+  const f = fakes(speech, { speechResult: options => ({ key: options.messageInstance }) });
+  const first = f.screen.draw({}, 800, 600).key;
+  f.setView({ ...speech, speechInstance: 2 });
+  const second = f.screen.draw({}, 800, 600).key;
+  assert.notEqual(first, second);
 });
