@@ -311,4 +311,8 @@ void storm_bnvec_sub_word(StormBnVec* v, uint32_t w, const StormBnVec* src) {
 }
 
 // C-linkage entry point for the FN probe (storm_bnvec_touch is in an anonymous namespace above).
-extern "C" void Storm_Port35C0(void* v, uint32_t idx) { storm_bnvec_touch((StormBnVec*)v, idx); }
+// 1.13c Storm+0x35C0 (ECX = relative index): retail adds the base at +0x10 first (`uVar5 = in_EAX[4] + param_1`).
+extern "C" void Storm_Port35C0(void* v, uint32_t rel) {
+    StormBnVec* b = (StormBnVec*)v;
+    storm_bnvec_touch(b, b->base + rel);
+}

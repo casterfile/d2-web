@@ -10,13 +10,18 @@ export function closeStashFromInventory({ stashOpen, commandButton, onAccepted }
   return accepted;
 }
 
-// The stash's own close cel (buysellbtn, 32x32 at x=352, bottom row 476). Retail draws every list button
-// at frame base + held (D2Client+0x95C60); the rect is the cel -- ponytail: the stash entry's exact
-// hit bounds are not recovered, widen to the inclusive rect if a retail trace shows one.
-export function stashCloseAt(px, py, width, height, visible) {
-  if (!visible || width <= 0 || height <= 0) return false;
+// The stash's own close button. Whether a point is on it is the engine's hit test
+// (src/core/d2client/d2client_8cd00.cpp, exported as d2_client_stash_close_hit):
+// hit(x, y, originX, originY, screenHeight, expansion) -> 1 on the button. The game draws in
+// 800x600, where retail's panel origin is (80, -60); the button then covers x 353..391, y 442..480
+// in an expansion game and x 356..394, y 441..479 in a classic one.
+export const STASH_PANEL_ORIGIN = Object.freeze({ x: 80, y: -60, height: 600 });
+
+export function stashCloseAt(px, py, width, height, visible, hit, expansion = true) {
+  if (!visible || width <= 0 || height <= 0 || typeof hit !== 'function') return false;
   const scale = Math.min(1, width / 800, height / 600);
-  const x = (px - (width - 800 * scale) / 2) / scale;
-  const y = (py - (height - 600 * scale) / 2) / scale;
-  return x >= 352 && x < 384 && y >= 445 && y < 477;
+  const x = Math.floor((px - (width - 800 * scale) / 2) / scale);
+  const y = Math.floor((py - (height - 600 * scale) / 2) / scale);
+  const { x: ox, y: oy, height: sh } = STASH_PANEL_ORIGIN;
+  return hit(x, y, ox, oy, sh, expansion ? 1 : 0) === 1;
 }

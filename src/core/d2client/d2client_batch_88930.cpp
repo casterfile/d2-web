@@ -38,7 +38,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88930(D2c88State* s, const D2c88E
                 if (u < o40) u = o40;
                 if (!rd<int32_t>(p, 0x45) || rd<int32_t>(p, 0x4d) || s->now + u < rd<uint32_t>(p, 0x55)) {
                     wr<uint32_t>(p, 0x3d, 1);
-                    if (!u) e->fn87ed0(1, 0);
+                    if (!u) e->fn87ed0((int)(intptr_t)key, 0);   // EDX still holds the key (0x87E90 leaves it alone)
                     else {
                         wr<uint32_t>(p, 0x51, s->now);
                         wr<uint32_t>(p, 0x49, rd<uint32_t>(p, 0x1c));
@@ -58,7 +58,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88ba0(D2c88State* s, const D2c88E
     if (!key) return;
     for (void** n = s->list; n; n = (void**)n[1])
         if (rd<uint8_t*>((uint8_t*)n[0], 8) == key) {
-            float v[3] = {(float)x, (float)y, (float)z + s->biasZ};
+            float v[3] = {(float)x, (float)y, (float)((double)z + (double)s->biasZ)};   // fild z; fadd bias; fstp: one rounding to float
             e->fn88350(v, n[0]);
             return;
         }
@@ -73,10 +73,10 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88bf0(D2c88State* s, const D2c88E
 // 1.13c D2Client+0x88C20 (key in EAX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88c20(D2c88State* s, const D2c88Env* e, uint8_t* key, int32_t p1, int32_t p2) {
     if (!key || !p1) e->fatal(0xCE);
-    e->ord10062();
+    e->ord10062((uint32_t)p1 + 0x78, (uint32_t)(uintptr_t)key);
     uint8_t* o = find(s, key);
     if (!o) return;
-    e->ord10062();
+    e->ord10062((uint32_t)(uintptr_t)(o + 0x28), (uint32_t)p1);
     bool w = !R(s, rd<int32_t>(o, 4), 0x3e) || (rd<int32_t>(o, 0x45) && !rd<int32_t>(o, 0x4d));
     if (rd<int32_t>(o, 0x28)) return;
     if (!p2 && w) return;

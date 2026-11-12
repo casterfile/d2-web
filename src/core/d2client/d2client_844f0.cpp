@@ -29,12 +29,13 @@ extern "C" void d2c_844f0(uint32_t pkt, const cl::Env& e) {
     if (e.R(unit) == 0) e.H(0xca0c, e.R(unit + 0x60));
     if (!e.H(0xc1a8, item, 0x100, 0x96, 0xB2000000u | 0xD4964u)) e.H(0xc544, unit, item);
     uint32_t it = item;
-    if (e.H(0xca3c, buf[3], 0x20)) {
+    const uint32_t r20 = e.H(0xca3c, buf[3], 0x20);
+    if (r20) {
         const uint32_t iid = e.R(item + 0xc);
         e.H(0xa6ef0, iid, 4, 0, 0, 0, 0, 0xB2000000u | 0x10AE08u, iid & 0x7f);
         if (unit != pl) return;
         if ((buf[4] & 0xff) == 1) e.H(0x88a70, 0, 0, 0, 0, 0, 0, 0, 0, 1);
-        else { e.W(e.gl + 516, 0); e.W(e.gl + 528, 1); e.W(e.gl + 520, 5); e.W(e.gl + 524, 0); }
+        else { e.W(e.gl + 516, 1); e.W(e.gl + 528, 1); e.W(e.gl + 520, 5); e.W(e.gl + 524, 1); }   // EBX = 1 here in retail
     } else {
         if (e.H(0xca3c, buf[3], 1)) {
             e.H(0xa6ef0, id, 4, 0, 0, 0, 0, 0xB2000000u | 0x10AE08u, id & 0x7f);

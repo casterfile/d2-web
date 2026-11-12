@@ -39,7 +39,7 @@ template <class E> uint32_t WriteItems(E& e, uint32_t buf, uint32_t unit, int32_
     if (prim) {
         if (right == prim) {
             if (!pre(right)) return 0xFFFFFFFFu;
-            if (left) { if (!pre(left) || !pre(right)) return 0xFFFFFFFFu; }
+            if (left) { if (!pre(left)) return 0xFFFFFFFFu; }
         } else {
             if (!pre(left)) return 0xFFFFFFFFu;
             if (right && !pre(right)) return 0xFFFFFFFFu;

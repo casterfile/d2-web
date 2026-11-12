@@ -32,7 +32,7 @@ static inline uint32_t rd32(uint32_t a) { uint32_t v; std::memcpy(&v, (const voi
 static inline void wr32(uint32_t a, uint32_t v) { std::memcpy((void*)(uintptr_t)a, &v, 4); }
 
 // 1.13c D2Game+0x6B070
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_6b070(uint32_t game, uint32_t unit, uint32_t classId, uint32_t item, const D2Game6B070Env* env)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_6B070(uint32_t game, uint32_t unit, uint32_t classId, uint32_t item, const D2Game6B070Env* env)
 {
     uint32_t c[2] = {}, pt[2];
     env->a544(unit, (uint32_t)(uintptr_t)c);

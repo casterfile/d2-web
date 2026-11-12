@@ -121,6 +121,7 @@ static void setCur(D2cItem83* s, const D2cItem83Env* e, P owner, P item) {
 extern "C" EMSCRIPTEN_KEEPALIVE P d2_client_835c0(D2cItem83* s, const D2cItem83Env* e, const uint8_t* pkt,
                                                    const uint8_t* init, uint32_t a, uint32_t b, uint32_t esi) {
     uint8_t buf[20];
+    a &= 0xffff; b &= 0xffff;
     if (!init) { e->decode(pkt + 8, rd<uint8_t>(pkt, 2) - 8, 0, buf); init = buf; }
     uint32_t mode = rd<uint8_t>(init, 8);
     a &= 0xffff; b &= 0xffff;   // both words are zero-extended before use

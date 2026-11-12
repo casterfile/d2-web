@@ -208,3 +208,123 @@ extern "C" __attribute__((used)) void d2_client_c7e30(uint32_t u, int32_t x, int
  e.wr32 = [](P a, uint32_t v) { *(uint32_t*)a = v; };
  sub_C7E30(e, (P)u, x, y, z);
 }
+
+// ---- retail call sites (seam ports). Every callee is one FnCallees call.
+namespace d2client_batch_c79c0_seam {
+static inline uint32_t R(uint32_t a, uint32_t o) { return fnAt<uint32_t>(fnPtr(a), o); }
+static inline void W(uint32_t a, uint32_t o, uint32_t v) { fnAt<uint32_t>(fnPtr(a), o) = v; }
+static inline uint32_t L(void* p) { return (uint32_t)(uintptr_t)p; }
+
+// 1.13c D2Client+0xC7B00
+void sub_C7B00(FnCallees& s, uint32_t unit) {
+    uint32_t p = 0;
+    if (unit && R(unit, 0x54)) p = R(R(unit, 0x54), 0x30);
+    if (!p) {
+        p = s.h(0xbf7a, 0, 0x4c, s.mod(0xd5258), 0, 0, 0x48, 0);
+        if (!p) s.fatal(0x4a);
+    }
+    for (uint32_t i = 0; i < 0x13; i++) W(p, 4 * i, 0);
+    if (unit && R(unit, 0x54)) W(R(unit, 0x54), 0x30, p);
+}
+
+// 1.13c D2Client+0xC7C80
+void sub_C7C80(FnCallees& s, uint32_t unit, uint32_t n, uint32_t k) {
+    (void)s;
+    if (!unit || !R(unit, 0x54)) return;
+    uint32_t c = R(R(unit, 0x54), 0x30);
+    if (!c) return;
+    W(c, 0, R(c, 0) | 2);
+    W(c, 0x48, n);
+    if ((int32_t)n < 1) W(c, 0x48, 1);
+    uint32_t z = k << 11;
+    W(c, 4, 0); W(c, 8, 0); W(c, 0xc, z);
+    if (!R(c, 0x24)) W(c, 0x24, 0xfffff000u);
+    int32_t m = (int32_t)R(c, 0x48);
+    int32_t q = (int32_t)((uint32_t)m * (uint32_t)m * R(c, 0x24));
+    W(c, 0x10, 0); W(c, 0x14, 0);
+    int32_t num = (int32_t)(0u - z - (uint32_t)(q / 2));
+    W(c, 0x18, (uint32_t)(num / m));
+}
+
+// 1.13c D2Client+0xC7FB0
+void sub_C7FB0(FnCallees& s, uint32_t unit) {
+    if (!unit || !R(unit, 0x54)) return;
+    uint32_t c = R(R(unit, 0x54), 0x30);
+    if (!c) return;
+    uint32_t f = R(c, 0);
+    if (f & 1) return;
+    uint32_t v = R(c, 0x10);
+    W(c, 4, R(c, 4) + v); W(c, 0x10, R(c, 0x1c) + v);
+    v = R(c, 0x14);
+    W(c, 8, R(c, 8) + v); W(c, 0x14, R(c, 0x20) + v);
+    v = R(c, 0x18);
+    W(c, 0xc, R(c, 0xc) + v);
+    uint32_t vz = R(c, 0x24) + v;
+    W(c, 0x18, vz);
+    if (f & 2) {
+        if (R(c, 0x48)) W(c, 0x48, R(c, 0x48) - 1);
+        else { W(c, 0, f | 1); W(c, 4, 0); W(c, 8, 0); }
+    }
+    uint32_t fl = R(c, 0);
+    bool snap = false;
+    if (fl & 4) {
+        if (((int32_t)R(c, 0xc) >> 11) <= (int32_t)R(c, 0x30)) {
+            W(c, 0x18, (uint32_t)((int32_t)(R(c, 0x44) * vz) / -100));
+            W(c, 0xc, R(c, 0x30));
+            if (R(c, 0x40)) W(c, 0x40, R(c, 0x40) - 1);
+            else W(c, 0, fl | 1);
+        }
+    } else if (fl & 0x10) {
+        uint32_t r = s.h(0xa60d0, unit);
+        if (!r) goto tail;
+        uint32_t ty = R(unit, 0), kind = 8;
+        uint32_t lx = 0, ly = 0;
+        if (ty == 1) kind = 0xe;
+        else if (ty == 3) {
+            if (R(r, 0) != 1) s.fatal(0x1a9);
+            uint32_t m = R(r, 0x10);
+            if (m == 0 || m == 0xc) return;
+            kind = 0xe;
+        }
+        s.h(0x6a6b0, r, 0, 0, 0, 0, kind, L(&lx), L(&ly));
+        W(c, 0x34, lx); W(c, 0x3c, ly);
+        if (R(unit, 0) == 3) W(c, 0x3c, ly + 10);
+        W(c, 0x34, R(c, 0x34) + s.h(0xc7f60, r));
+        W(c, 0x3c, R(c, 0x3c) + s.h(0xc7f20, r));
+        W(c, 4, R(c, 0x34)); W(c, 8, R(c, 0x38));
+        s.h(0xc9ac, 0, 0, 0, 0, 0, c + 4, c + 8);
+        W(c, 0xc, 0u - (R(c, 0x3c) << 11));
+    } else {
+        int32_t x = (int32_t)R(c, 4) >> 11, y = (int32_t)R(c, 8) >> 11, z = (int32_t)R(c, 0xc) >> 11;
+        int32_t tx = (int32_t)R(c, 0x28), ty = (int32_t)R(c, 0x2c), tz = (int32_t)R(c, 0x30);
+        if (!(fl & 0x20)) snap = x <= tx && y <= ty && z <= tz;
+        else snap = x >= tx && y >= ty && z >= tz;
+        if (snap) {
+            W(c, 4, (uint32_t)tx << 11); W(c, 8, (uint32_t)ty << 11); W(c, 0xc, (uint32_t)tz << 11);
+            W(c, 0, fl | 1);
+        }
+    }
+tail:
+    if (fnAt<uint8_t>(fnPtr(c), 0) & 0x10) return;
+    W(c, 0x34, (uint32_t)((int32_t)R(c, 4) >> 11));
+    W(c, 0x38, (uint32_t)((int32_t)R(c, 8) >> 11));
+    s.h(0xcc2e, 0, 0, 0, 0, 0, c + 0x34, c + 0x38);
+    W(c, 0x3c, 0u - (uint32_t)((int32_t)R(c, 0xc) >> 11));
+}
+
+// 1.13c D2Client+0xC8220
+uint32_t sub_C8220(FnCallees& s, uint32_t a, uint32_t b, uint32_t c, uint32_t io) {
+    uint32_t blk[14] = {};   // retail's 0x38-byte stack block; words 2, 5-7, 10-13 are residue the capture masks
+    blk[0] = a; blk[1] = b; blk[3] = c; blk[4] = R(io, 0);
+    uint32_t r = s.h(0x10680, s.mod(0xd71e4), 0xf, L(blk), 0, 0, 0x38);
+    s.blk(0x10680, blk, 14);
+    if (r) return r;
+    uint32_t e = s.h(0x10250, L(blk), 0, 4);
+    if (e == 1) {
+        W(io, 0, blk[5]);
+        return s.h(0x10640, L(blk));
+    }
+    s.h(0x10640, L(blk));
+    return e ? e : 0xfffffffbu;
+}
+}

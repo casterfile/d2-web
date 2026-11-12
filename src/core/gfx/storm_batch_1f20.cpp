@@ -558,7 +558,7 @@ extern "C" void Storm_Sub1C30(void* e) {
 // 1.13c Storm+0x1DA0: free the SOURCE array storage (data at +8).
 extern "C" void Storm_Sub1DA0(void* a) { GuestFree(a, 8, ".?AU_SOURCE@@"); }
 // 1.13c Storm+0x1DF0: free the RECTF array storage.
-extern "C" void Storm_Sub1DF0(StormFixedArray* a) { if (a->data) StormFree(a->data); }
+extern "C" void Storm_Sub1DF0(StormFixedArray* a) { if (a->data) StormFreeTag(a->data, ".?AURECTF@@"); }   // SMemFree(data, "AURECTF", -2) through 0x1B960
 // 1.13c Storm+0x1E40: free the FOUNDPARAM array storage.
 extern "C" void Storm_Sub1E40(void* a) { GuestFree(a, 8, ".?AU_FOUNDPARAM@@"); }
 

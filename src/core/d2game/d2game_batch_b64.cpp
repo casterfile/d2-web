@@ -9,6 +9,7 @@
 #include <cstdint>
 #include <cstring>
 #include <initializer_list>
+#include "d2game_cbf50.h"
 
 static inline uint32_t rd32(uint32_t a, uint32_t o) { uint32_t v; std::memcpy(&v, (const void*)(uintptr_t)(a + o), 4); return v; }
 static inline uint16_t rd16(uint32_t a, uint32_t o) { uint16_t v; std::memcpy(&v, (const void*)(uintptr_t)(a + o), 2); return v; }
@@ -208,31 +209,17 @@ void d2game_cba20(uint32_t ecx, uint32_t unit, uint32_t tblIdx, uint32_t ebp) {
     g_b->fAA3E0(ecx, pk, 0x10);
 }
 
-// 1.13c D2Game+0xCBF50 (EAX=packet ptr, ESI=unit, retaddr word=game, slotAddr5=the write target ghidra shows as
-// absolute address 5)
+// D2Game 0xCBF50 lives in d2game_cbf50.cpp (retail convention: EAX = packet, ESI = unit, stack game/length/&x/&y); this adapter
+// feeds it the batch seams. The x word lands in *out1, y in *out2.
+static uint32_t b64_cb690(uint32_t eax, uint32_t ebx, uint32_t s0, uint32_t s1) { return d2game_cb690(eax, (int32_t)ebx, (uint16_t)s0, (uint16_t)s1); }
+static uint32_t b64_o10920(uint32_t u) { return g_b->o10920(u); }
+static uint32_t b64_1130(uint32_t u) { return g_b->f1130(u); }
+static uint32_t b64_1100(uint32_t u) { return g_b->f1100(u); }
+static void b64_bf80(uint32_t, uint32_t id, uint32_t c, uint32_t a, uint32_t b, uint32_t f) { g_b->fBF80(0, id, c, (int16_t)a, (uint16_t)b, (uint8_t)f); }
 int32_t d2game_cbf50(uint32_t pkt, uint32_t unit, uint32_t game, int32_t param2, uint16_t* out1, uint16_t* out2,
-                     uint32_t slotAddr5) {
-    *out1 = 0; *out2 = 0;
-    if (param2 != 5) return 3;
-    uint32_t p = g_b->o10920(unit);
-    if (!p) return 2;
-    uint16_t y = rd16(pkt, 3), x = rd16(pkt, 1);
-    uint32_t far_ = d2game_cb690(unit, 0, x, y);   // retail passes EBX = range pinned by caller
-    if (far_) {
-        if (0x19 < (int32_t)(rd32(game, 0xa8) - rd32(p, 0x168)) && unit && rd32(unit, 0) == 0) {
-            uint32_t q = rd32(g_b->o10920(unit), 0x9c);
-            if (q) {
-                uint32_t id = rd32(unit, 0xc);
-                uint16_t a = (uint16_t)g_b->f1130(unit), b = (uint16_t)g_b->f1100(unit);
-                g_b->fBF80(0, id, q, (int16_t)b, a, 1);
-            }
-        }
-        return (int32_t)far_;
-    }
-    wr32(p, 0x168, rd32(game, 0xa8));
-    if (slotAddr5) wr16(slotAddr5, 0, x);
-    *out1 = y;
-    return 0;
+                     uint32_t) {
+    static const D2GameCBF50Env env{ b64_o10920, b64_cb690, b64_1130, b64_1100, b64_bf80 };
+    return (int32_t)d2game_cbf50_port(pkt, unit, game, (uint32_t)param2, (uint32_t)(uintptr_t)out1, (uint32_t)(uintptr_t)out2, &env);
 }
 
 // 1.13c D2Game+0xCE040 (fastcall ecx=param_1, edx=param_2; stack param_3, param_4; hidden regs of 0xCBF50 forwarded)
@@ -255,43 +242,4 @@ void d2game_ce120(uint32_t ebx, uint32_t esi) {
     g_b->o10329();
 }
 
-// 1.13c D2Game+0xCE150 (fastcall ecx=param_1, edx=param_2=unit; param_3=skill record ptr; tblIdx = caller-frame
-// index into the 12-byte table; retaddr = param passed on to 0xC230)
-void d2game_ce150(uint32_t p1, uint32_t unit, uint32_t rec, uint32_t tblIdx, uint32_t retWord) {
-    uint16_t y = 0;
-    if (!rec) { g_b->o10024("", g_b->o10265(0xfb)); return; }   // retail _exit(-1)
-    uint32_t cur;
-    if ((rd8(rec, 0x3d4) & 1) == 0) {
-        if (rd32(rec, 0x174) == 0) cur = 0;
-        else { cur = g_b->f003A0(rd32(rec, 0x1a8), rd32(rec, 0x170)); if (!cur) wr32(rec, 0x174, 0); }
-    } else cur = rd32(rec, 0x174);
-    if (unit == cur) return;
-    g_b->f007A0(p1);
-    uint32_t other = g_b->o10392(rd32(unit, 0x2c));
-    if (other != unit && other) {
-        uint32_t o = g_b->o10331(other);
-        if (o) {
-            uint32_t cnt = rd32(o, 0x78);
-            for (uint32_t i = 0; i < cnt; i++)
-                if (rd32(rd32(o, 0x48), i * 4) == rec) {
-                    g_b->fC230(0, rd32(unit, 0xc), retWord, g_b->tab_ce8(tblIdx), (uint8_t)rd32(other, 0), rd32(other, 0xc),
-                               (int16_t)g_b->f1100(unit), (uint16_t)g_b->f1130(unit));
-                    return;
-                }
-        }
-    }
-    uint32_t path = rd32(unit, 0x2c);
-    uint16_t x = unitHasPath(rd32(unit, 0)) || path ? (uint16_t)unitX(unit) : 0;
-    uint16_t w1 = g_b->o10764(path), w2 = g_b->o10983(path);
-    uint8_t pk[16] = {0};
-    pk[0] = 0xf;
-    uint32_t id = rd32(unit, 0xc);
-    std::memcpy(pk + 2, &id, 4);
-    pk[6] = (uint8_t)g_b->tab_ce4(tblIdx);
-    std::memcpy(pk + 7, &w2, 2);
-    std::memcpy(pk + 9, &w1, 2);
-    pk[11] = 0;
-    y = x;
-    std::memcpy(pk + 12, &y, 2);
-    g_b->fAA3E0(p1, pk, 0x10);
-}
+// D2Game 1.13c 0xCE150: the retail-layout port is src/core/d2game/d2game_ce150.cpp (ECX = game, EDX = unit, stack client, table index).

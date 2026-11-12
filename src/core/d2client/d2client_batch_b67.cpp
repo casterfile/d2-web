@@ -7,7 +7,6 @@ typedef int32_t i32; typedef uint32_t u32;
 extern "C" {
 __attribute__((weak)) u32 Ordinal_10265(u32);
 __attribute__((weak)) void Ordinal_10024(const void*, u32);
-u32 sub_18D0(uint8_t* seed);  // D2Client+0x18D0, rand on the 8-byte seed
 }
 namespace {
 // seed = {lo,hi}: lo' = lo*0x6ac690c5 + hi; writes 64-bit result back, returns it
@@ -69,7 +68,7 @@ extern "C" void d2c_80ca0(uint8_t* player, i32 flag, i32* o392c, i32* o3930, i32
     *o_bf6c = 0;
 }
 // 1.13c D2Client+0x80E30 (seed = register EBX = player+0x20, obj = DAT_6fbcbf68, flag = DAT_6fbcbf78)
-extern "C" void d2c_80e30(uint8_t* seed, const uint8_t* obj, i32 flag, i32* g3934, i32* g394c, i32* g3918, i32* g3938, i32* g38bc, i32* g393c, i32 bf6c, void (*sub_80700)(uint8_t*)) {
+extern "C" void d2c_80e30(uint8_t* seed, const uint8_t* obj, i32 flag, i32* g3934, i32* g394c, i32* g3918, i32* g3938, i32* g38bc, i32* g393c, i32 bf6c, void (*sub_80700)(uint8_t*), i32 g38ec, i32 g392c) {
     while ((i32)rd(obj, 0x114) < *g3934) sub_80700(seed);
     i32 d = (flag == 0) + 1;
     if (*g394c < *g3918) { *g3918 -= d; if (*g394c > *g3918) *g3918 = *g394c; }
@@ -83,7 +82,13 @@ extern "C" void d2c_80e30(uint8_t* seed, const uint8_t* obj, i32 flag, i32* g393
         } else {
             uint64_t v = step(seed);
             *g3938 = (i32)((u32)v % 0x36b) + 0xfa;
-            *g394c = (i32)sub_18D0(seed);
+            // 1.13c D2Client+0x18D0 (ECX = seed, ESI = range = DAT 0x1138EC, EDI = base = DAT 0x11392C):
+            // range <= 0 gives the base; else step the seed, power-of-two range masks lo, any other takes lo % range; + base
+            if (g38ec <= 0) *g394c = g392c;
+            else {
+                u32 lo = (u32)step(seed);
+                *g394c = (i32)(((g38ec & (g38ec - 1)) == 0 ? (lo & (u32)(g38ec - 1)) : lo % (u32)g38ec) + (u32)g392c);
+            }
         }
     }
     if (bf6c != 0 && --*g38bc == 0) *g393c = 1;

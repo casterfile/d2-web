@@ -187,11 +187,11 @@ void d2c_62580(uint32_t room, uint32_t a1, uint32_t force, uint32_t ctx, uint32_
 // from [0x11CC1C0], else make one (0x5F240); if it is not the current ([0x11CC1C4]), swap: 0x61140, 0x5F300,
 // set current, 0x61E70.
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_62710(uint32_t key, uint32_t head_c1c0, uint32_t* cur_c1c4, uint32_t (*sub_5f240)(void),
+uint32_t d2_client_62710(uint32_t key, uint32_t head_c1c0, uint32_t* cur_c1c4, uint32_t (*sub_5f240)(uint32_t),
                          void (*sub_61140)(void), void (*sub_5f300)(void), void (*sub_61e70)(void)) {
     uint32_t p = head_c1c0;
     for (; p; p = rd32(p + 0x18)) if (rd32(p) == key) break;
-    if (!p) p = sub_5f240();
+    if (!p) p = sub_5f240(key);   // EAX still holds the key at the call (retail never reloads it)
     if (p != *cur_c1c4) { sub_61140(); sub_5f300(); *cur_c1c4 = p; sub_61e70(); }
     return p;
 }

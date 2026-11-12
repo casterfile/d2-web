@@ -20,11 +20,11 @@ struct D2c88State {
 
 struct D2c88Env {
     int  (*fn87e90)(uint8_t* obj, int v);
-    void (*fn87ed0)(int a, int b);
+    void (*fn87ed0)(int key, int value);   // 0x87ED0: ECX = 1, EDX = key, stack word = value
     void (*fn88350)(const float* v, void* obj);
     void (*fn88550)(void* obj);
     uint32_t (*fn88a70)(int, int, int, int);
-    void (*ord10062)(void);
+    void (*ord10062)(uint32_t ecx, uint32_t edx);   // D2sound#10062 via thunk 0xD258 (fastcall: list head, key)
     uint32_t (*ord10065)(uint32_t);
     void (*ord10043)(uint32_t, uint32_t);
     void (*fn8a1a0)(void);

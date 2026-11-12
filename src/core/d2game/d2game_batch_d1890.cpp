@@ -31,15 +31,15 @@ static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, 
 // item from 10828 (or 10507) yields its handle and name into +0x06/+0x04 (or +0x05/+0x03), with
 // -1/0 when the handle is null. The decompile carries the context in ESI.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D1890(uint32_t* ctx, const D2GameBatchBd18Env* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D1890(uint32_t* ctx, const void* unit, const D2GameBatchBd18Env* env)
 {
     static const char kItemModeFile[] = "..\\Source\\D2Game\\ITEMS\\ItemMode.cpp";
 
-    ctx[0] = env->ordinal10973();
-    ctx[1] = env->ordinal10973();
-    ctx[2] = env->ordinal10973();
+    ctx[0] = env->unitStat10973(unit, 6, 0);
+    ctx[1] = env->unitStat10973(unit, 8, 0);
+    ctx[2] = env->unitStat10973(unit, 0xA, 0);
 
-    const void* item = env->ordinal10828();
+    const void* item = env->ordinal10828(unit);
     if (item == nullptr) {
         ctx[6] = 0xFFFFFFFFu;
         ctx[4] = 0;
@@ -49,7 +49,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D1890(uint32_t* ctx, const D2GameBatchBd1
         ctx[4] = env->ordinal10601(item, kItemModeFile, 0x9E0);
     }
 
-    const void* owner = env->ordinal10507();
+    const void* owner = env->ordinal10507(unit);
     if (owner != nullptr) {
         ctx[5] = env->ordinal10304(owner);
         ctx[3] = env->ordinal10601(owner, kItemModeFile, 0x9EC);

@@ -30,7 +30,7 @@ struct D2C7DE50 {
     void (*del_10422)(int, void*);
     void* (*str_10454)(int, const char*, uint32_t);
     void (*s_7d200)(int16_t, int);
-    void (*s_7c8f0)(void);
+    void (*s_7c8f0)(uint16_t);   // retail: ret 4, the zero-extended u16 @+10
     void (*fail)(void);          // 10265(0x5a)+10024 then _exit(-1)
 };
 
@@ -40,7 +40,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_7de50(const uint8_t* pkt, D2C7DE5
         if (kind != 2) { c->free_10660(*c->obj_113b10); *c->obj_113b10 = nullptr; return; }
         const uint32_t id = ld<uint32_t>(pkt, 2);
         const uint8_t* n = (const uint8_t*)c->find_54e20(id, c->nodes_10aa08, 2);
-        if (pkt[8] == 3) { c->s_7c8f0(); return; }
+        if (pkt[8] == 3) { c->s_7c8f0(ld<uint16_t>(pkt, 10)); return; }
         *c->w_113af4 = 0;
         *c->d_113ac6 = id;
         if (n) *c->w_113af4 = (uint16_t)ld<uint32_t>(n, 4);

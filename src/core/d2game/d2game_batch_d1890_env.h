@@ -6,10 +6,12 @@
 struct D2GameBatchBd18Env {
     // D2Common ordinal 10973 (1.13c): three independent reads fill a timer/mode context.
     uint32_t (*ordinal10973)();
+    // D2Common ordinal 10973(unit, stat, 0) as 0xD1890 calls it: the unit stat read (stats 6, 8, 0xA).
+    uint32_t (*unitStat10973)(const void* unit, uint32_t stat, uint32_t layer);
     // D2Common ordinal 10828: the current item/cursor unit handle.
-    void*    (*ordinal10828)();
+    void*    (*ordinal10828)(const void* unit);
     // D2Common ordinal 10507: a second item/owner handle.
-    void*    (*ordinal10507)();
+    void*    (*ordinal10507)(const void* unit);
     // D2Common ordinal 10304(unit): the handle stored beside the string result.
     uint32_t (*ordinal10304)(const void* unit);
     // D2Common ordinal 10601(unit, file, line): the named/file-tagged result of the unit.

@@ -179,7 +179,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t GAME_RandomActionRoll_2EAD0(void* thisp, uint32_t 
 // 0xAB220 with the eight arguments shown, every other index 0xAB290.
 // 1.13c D2Game+0x96920
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96920(uint32_t param1, uint32_t eaxUnit,
+EMSCRIPTEN_KEEPALIVE void d2game_legacy_96920(uint32_t param1, uint32_t eaxUnit,
                                              const D2GameBatchD4630Env* env)
 {
     const uint32_t owner = env->ordinal10920();

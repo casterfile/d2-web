@@ -49,6 +49,10 @@ void UnlinkNode(uint8_t* n) {
     if ((int32_t)tag < 0) prev = (uint8_t*)(uintptr_t)(uint32_t)~tag;
     else prev = n + (uint32_t)(tag - rd32((void*)((uint8_t*)(uintptr_t)link + 4)));
     wr32(prev, link);
+    // retail reloads both fields after the store to prev (Storm+0x1CF0 disassembly: mov ecx,[eax] / mov edx,[eax+4]
+    // after the store at +0x42 and +0x7F): when prev is n+4 (the tag slot) the stored link is the value written onward.
+    link = rd32(n);
+    tag = rd32(n + 4);
     wr32((void*)((uint8_t*)(uintptr_t)link + 4), tag);
     wr32(n, 0);
     wr32(n + 4, 0);

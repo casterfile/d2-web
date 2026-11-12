@@ -12,7 +12,7 @@ int32_t __stdcall STATLIST_GetTotalStatValue(D2StatListStrc* pStatList, int nSta
 extern "C" {
 
 // 1.13c D2Common+0x38B70
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38b70(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer)
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38b70(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer)
 {
 	if (!pUnit)
 		return 0;

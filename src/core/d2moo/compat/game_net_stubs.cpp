@@ -941,7 +941,11 @@ void __fastcall D2GAME_SendPacket0x4E_6FC3F410(D2ClientStrc* pClient, D2GSPacket
 void __fastcall D2GAME_SendPacket0x58_6FC3F520(D2ClientStrc* pClient, D2GSPacketSrv58* pPacket) {
     if (pClient && pPacket) D2GAME_PACKETS_SendPacket_6FC3C710(pClient, pPacket, sizeof(*pPacket));
 }
-void D2GAME_SendPacket0x8E_CorpseAssign_ToAllPlayers_6FC3F9B0(D2GameStrc* pGame, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {}
+// The corpse pair goes to every living player's client (the routine in client_save_batch_d5740.cpp does the loop), so a joined client learns its body.
+void D2GAME_8CF80_CorpseAssignment(D2GameStrc* game, int32_t playerId, int32_t corpseId, uint8_t assign);
+void __fastcall D2GAME_SendPacket0x8E_CorpseAssign_ToAllPlayers_6FC3F9B0(D2GameStrc* pGame, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {
+    D2GAME_8CF80_CorpseAssignment(pGame, nUnitId, nCorpseId, bAssign);
+}
 // Corpse-assign packet (0x8E) to one client; defined here because the vendored SCmd.cpp is not linked.
 void __fastcall D2GAME_PACKETS_SendPacket0x8E_6FC3FA20(D2ClientStrc* pClient, int32_t nUnitId, int32_t nCorpseId, BYTE bAssign) {
     D2GSPacketSrv8E packet8E = {};

@@ -161,7 +161,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_8db00_impl(uint32_t eaxUnitId, uint32_t ebxClie
 // playerData+0x30; the function returns whether the entry whose first dword equals ECX has a value
 // of 2 in its second dword. The caller guarantees neither block, so a null path faults in retail.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_486d0(uint32_t ecxId, uint32_t eaxUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2game_486D0(uint32_t ecxId, uint32_t eaxUnit)
 {
     const void* list;
     if (eaxUnit == 0 || rd32((void*)(uintptr_t)eaxUnit, 0) != 1) {

@@ -21,7 +21,7 @@ struct D2GameBatchB58aEnv {
 
 // 1.13c D2Game+0x96810
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_96810(uint32_t, int32_t* p2, const uint32_t* p3,
+EMSCRIPTEN_KEEPALIVE void d2game_legacy_96810(uint32_t, int32_t* p2, const uint32_t* p3,
                                              const D2GameBatchB58aEnv* env)
 {
     if (p2 && *p2 == 0) env->ord10920(p2);

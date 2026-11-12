@@ -41,7 +41,19 @@ extern "C" uint32_t Storm_Sub387F0Real(uint8_t* self, uint8_t* desc, uint32_t en
         }
     }
     uint32_t r[6] = { rd(desc, 0x18), rd(desc, 0x1c), rd(desc, 0x20), rd(desc, 0x24), rd(desc, 0x28), rd(desc, 0x2c) };
-    runStub(rd(self, 0x10), r);
+    // The row-end blocks (0x38A70 plain, 0x38A90 strided): the row count is the stack word [esp+4], the strides are desc+0x14 (source)
+    // and desc+0x10 (destination). Plain: --rows, done at zero, else advance both and re-enter. Strided: an odd count steps by
+    // desc+0x34 / desc+0x30 after its decrement, an even count by the plain strides.
+    uint32_t rows = rd(desc, 0xc);
+    const uint32_t sstride = rd(desc, 0x14), dstride = rd(desc, 0x10);
+    const bool strided = (rd(self, 8) & 0x4000000) != 0;
+    for (;;) {
+        if (runStub(rd(self, 0x10), r) == 0) break;   // the fixture ran off its stubs
+        if (strided && (rows & 1) == 0) { --rows; r[1] += sstride; r[0] += dstride; continue; }
+        if (--rows == 0) break;
+        if (strided) { r[1] += rd(desc, 0x34); r[0] += rd(desc, 0x30); }
+        else { r[1] += sstride; r[0] += dstride; }
+    }
     wr(desc, 0x24, r[3]); wr(desc, 0x28, r[4]); wr(desc, 0x2c, r[5]);
     return 1;
 }

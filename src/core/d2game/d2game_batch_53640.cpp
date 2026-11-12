@@ -162,7 +162,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_old_55a10(const uint8_t* pSection, vo
 // delegate to 0xEB910 ReadStatsEx. The section is magic 0x6667, a (nStats+7)/8-byte present mask at
 // +2, then one 32-bit word per set bit in stat order; unset stats are written as 0. The out pointer
 // advances past the mask and the words actually consumed. 0x12 is PLRSAVE2ERROR_BAD_STATS.
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_ebda0(void* pGame, void* pUnit, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion, int32_t nStats, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0xEBDA0
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_EBDA0(void* pGame, void* pUnit, uint8_t** ppSection, uint8_t* pEnd, uint32_t nVersion, int32_t nStats, const D2GameBatch53640Env* env) {  // 1.13c D2Game+0xEBDA0
     if (nVersion > 94) {
         return env->readStatsEx(pUnit, ppSection);
     }

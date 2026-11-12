@@ -25,23 +25,7 @@ static const char kItemMode[] = "..\\Source\\D2Game\\ITEMS\\ItemMode.cpp";
 static const char kSUnitDmg[] = "..\\Source\\D2Game\\UNIT\\SUnitDmg.cpp";
 static inline uint32_t& U32(I base, int off) { return *(uint32_t*)(base + off); }
 
-// 1.13c D2Game+0xCE520  (fastcall; stack params 3,4)
-I D2GAME_CE520(I p1, I p2, I p3, I p4)
-{
-    uint16_t a; uint16_t b;
-    I r = D2GAME_CEBF50(p1, p4, &a, &b);
-    if (r == 0) {
-        if (Ord10507(p2) == 0) return 3;
-        I u3 = 0x148, u2 = p2;
-        r = Ord10587(p2, 0x148, 0, 0);
-        Ord10887(p2, 0x148, r + 1);
-        Ord10507(p2, u2 & 0xffff, u3 & 0xffff);
-        D2GAME_CEDF30(p2);
-        r = 0;
-    }
-    (void)p3;
-    return r;
-}
+// 1.13c D2Game+0xCE520: moved to src/core/d2game/d2game_ce520.cpp (retail registers and stack).
 
 // 1.13c D2Game+0xCE620  (hidden: EAX=unit, EBX, EBP, ESI)
 I D2GAME_CE620(I eax, uint32_t ebx, I ebp, I esi, I p1)

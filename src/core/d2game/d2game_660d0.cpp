@@ -31,7 +31,7 @@ static uint32_t tryBlock(uint32_t game, uint32_t room, int32_t x, int32_t y, uin
 }
 
 // 1.13c D2Game+0x660D0
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_660d0(uint32_t game, uint32_t room, int32_t x, int32_t y, const D2Game660D0Env* env)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_660D0(uint32_t game, uint32_t room, int32_t x, int32_t y, const D2Game660D0Env* env)
 {
     const uint32_t list = rd32(game + 0x10f4);
     if (list == 0) return;

@@ -231,6 +231,14 @@ export function createRealmNpcScreen({ ui, view, menu, buyConfirm = null, vendor
       return true;
     },
     get confirmOpen() { return confirm !== null; },
+    /** The vendor stock the panel draws (trade / gamble) for hit tests, or null. */
+    shop() {
+      const v = current();
+      return v && (v.mode === 'trade' || v.mode === 'gamble') ? { items: vendorItemsFrom(v.stock, itemTable), classId: v.classId } : null;
+    },
+    /** Whether (x, y) is on a button of the open buy / repair confirm, or null while none is up. */
+    confirmTargets() { return confirm !== null && buyConfirm?.open ? buyConfirm.targets() : null; },
+    confirmAt(x, y) { return confirm !== null && buyConfirm?.open ? Boolean(buyConfirm.entryAt(x, y)) : null; },
     /** Called each frame: an NPC that left the scene ends its conversation. */
     checkScene(sceneMonsters) {
       const v = current();

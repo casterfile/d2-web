@@ -19,7 +19,7 @@ extern "C" int32_t d2_game_3ed8(void);         // 0x3ED8 __mtinitlocks
 // the shipped image. Teardown uses the shared lock table in d2game_batch_3e70.cpp.
 static uint32_t g_tls_index = 0xFFFFFFFFu;   // +0x0FF204 DAT_6fd1f204
 static void (*g_tls_free)(uint32_t);         // +0x10FD94 DAT_6fd2fd94 = FlsFree/TlsFree
-extern "C" void d2_fn_d2game_3f21(void);
+extern "C" void d2_fn_d2game_3F21(void);
 
 
 typedef uint32_t (*D2GameFlsAllocFn)(void (*callback)(void*));
@@ -63,7 +63,7 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3b63(void) {
         if (g_tls_free) g_tls_free(g_tls_index);
         g_tls_index = 0xFFFFFFFFu;
     }
-    d2_fn_d2game_3f21();
+    d2_fn_d2game_3F21();
 }
 
 // 1.13c D2Game+0x3B80 (__initptd): seed a thread-data block -- _initaddr +0x54 = the retail VA

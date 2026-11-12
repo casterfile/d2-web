@@ -350,7 +350,7 @@ function showBootFailure(why) {
       const smoke = StreamFS.fetched('/smoke.mpq', 0, size);
       const archives = await Promise.all(retail.map(async (r) => {
         const path = '/retail/' + r.f, readAt = (p, l) => StreamFS.readAt(path, p, l);
-        if (r.blob) StreamFS.registerBlob(path, r.blob, r.size); else StreamFS.register(path, 'retail/' + r.f, r.size);
+        if (r.blob) StreamFS.registerBlob(path, r.blob, r.size); else StreamFS.register(path, new URL('retail/' + r.f, document.baseURI).href, r.size);
         await StreamFS.fetched(path, 0, 32);
         const t = mpqTables(readAt(0, 32)); if (!t) return null;
         await Promise.all(t.map(([pos, n]) => StreamFS.fetched(path, pos, n * 16)));
@@ -371,7 +371,8 @@ function showBootFailure(why) {
         StreamFS.mount('/smoke.mpq', SMOKE_URL, size);
         log('streamfs: mounted /smoke.mpq (' + size + ' bytes)');
         if (retail.length) FS.mkdir('/retail');   // makeNode needs the parent dir to exist
-        for (const r of retail) r.blob ? StreamFS.mountBlob('/retail/' + r.f, r.blob, r.size) : StreamFS.mount('/retail/' + r.f, 'retail/' + r.f, r.size);
+        // Keep range reads on the same versioned asset base as the loaded client.
+        for (const r of retail) r.blob ? StreamFS.mountBlob('/retail/' + r.f, r.blob, r.size) : StreamFS.mount('/retail/' + r.f, new URL('retail/' + r.f, document.baseURI).href, r.size);
         if (retail.length) log('streamfs: mounted ' + retail.length + ' retail MPQs');
         if (tablesIn && typeof addRunDependency === 'function') {
           addRunDependency('d2-tables');

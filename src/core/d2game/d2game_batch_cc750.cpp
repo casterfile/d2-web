@@ -259,26 +259,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CD790(void* thisp, uint32_
     return r;
 }
 
-// 1.13c D2Game+0xCDF30  (param_1 = unit record, in_EAX = value, unaff_EDI/ESI passed through)
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_CDF30(const void* p1, uint32_t eax, void* edi, void* esi,
-                                                            const D2GameBatchCc75Env* env)
-{
-    if (!p1 || c7rd32(p1, 0x10) == 0 || c7rd32(p1, 0x10) == 0x11) return 2;
-    if (env->ord10747()) eax = env->sub0xCB1F0(eax);
-    int v = env->ord10787(p1, eax);
-    const uint8_t* rec = env->ord10858();
-    if (!rec) return 2;
-    if (0 < v && (v < 3 || v == 4) && (env->gdwBitMasks[0x10] & rec[7])) {
-        eax = env->ord10708(0xffffffffu);
-        v = env->ord10787(p1, eax);
-    }
-    int r = env->ord10952(p1, eax);
-    if (r) {
-        if (v == 0) { env->sub0x78550(edi, p1, eax, r, p1, esi, 0); return 0; }
-        if (v == 1) env->sub0xCBED0();
-    }
-    return 2;
-}
+// D2Game 1.13c 0xCDF30: the retail-layout port is src/core/d2game/d2game_cdf30.cpp (EAX = skill, ECX = unit, three stack words).
 
 // 1.13c D2Game+0xCE000
 extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_CE000(void* game, void* unit, uint32_t p3, uint32_t len,

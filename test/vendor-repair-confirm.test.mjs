@@ -43,10 +43,11 @@ test('the confirm no longer reuses the stash-gold amount box; Yes reaches the 0x
   const mod = readFileSync('play/assets/vendor-repair-confirm.mjs', 'utf8');
   assert.doesNotMatch(mod, /stash-gold-dialog/);
   const shell = readFileSync('play/gameplay-shell.mjs', 'utf8');
-  assert.match(shell, /create(?:Repair|Trade)Confirm\((?:\(id\) => )?repairAtVendor\b/);
-  const send = shell.slice(shell.indexOf('function repairAtVendor('));
-  assert.match(send.slice(0, 400), /d2_session_command_vendor_repair'/);
-  assert.match(shell, /d2_session_item_repair_cost/);
+  assert.doesNotMatch(shell, /repairAtVendor|d2_session_command_vendor_repair/);   // one view: no engine repair path
+  // Both modes take the packet path: the click opens the Repair box with the price and sends 0x35 only on Yes.
+  const carried = shell.slice(shell.indexOf('function realmCarriedClick('));
+  assert.match(carried.slice(0, 800), /d2gsClientItemPrice\?\.\(guid, view\.classId, 3\)/);
+  assert.match(carried.slice(0, 800), /askRepair\(guid, name, cost < 0 \? 0 : cost, send\)/);
   const src = readFileSync('src/core/monspawn/monspawn_check.cpp', 'utf8');
   assert.match(src.slice(src.indexOf('int d2_session_command_vendor_repair(')).slice(0, 400), /packetHeader = 0x35/);
   // The amount is 0x46230 in the repair cursor state (uiState 4: transaction type 3).
@@ -79,10 +80,7 @@ test('a refusal replaces the confirm, blocks a new request, and Continue (yes or
 
 test('both repair commands read the 0x2A result and open the refusal box', () => {
   const shell = readFileSync('play/gameplay-shell.mjs', 'utf8');
-  for (const fn of ['function repairAtVendor(', 'function repairAllAtVendor(']) {
-    const body = shell.slice(shell.indexOf(fn)).slice(0, 700);
-    assert.match(body, /takeTradeResult\(\);[\s\S]*showRepairRefusal\(takeTradeResult\(\)\)/);
-  }
+  assert.doesNotMatch(shell, /function repairAtVendor\(|function repairAllAtVendor\(|takeTradeResult/);   // the realm screen owns the refusal box
   const stubs = readFileSync('src/core/d2moo/compat/game_net_stubs.cpp', 'utf8');
   assert.match(stubs, /g_d2LastTransactionResult = \(uint8_t\)result;/);
 });
@@ -116,6 +114,5 @@ test('Repair mode survives Yes and a repair; No and the refusal Continue end it 
   assert.equal(vendorRepairArmed(), false);          // Continue (Enter) ends it
   assert.equal(c.no(), false);                       // nothing open: no end
   const shell = readFileSync(new URL('../play/gameplay-shell.mjs', import.meta.url), 'utf8');
-  assert.match(shell, /create(?:Repair|Trade)Confirm\([^;]*disarmVendorRepair[,)]/);
-  assert.doesNotMatch(shell, /repairConfirm\.request\(target\.id\)\) \{ disarmVendorRepair\(\)/);
+  assert.doesNotMatch(shell, /createTradeConfirm\(/);
 });

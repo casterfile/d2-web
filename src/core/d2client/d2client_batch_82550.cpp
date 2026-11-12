@@ -17,11 +17,12 @@ struct D2cEnv82 {
 struct D2cGlob82 {
     uint8_t*  player;       // +0x11BBFC DAT_6fbcbbfc
     uint8_t** unitHash;     // +0x10AE08, 128 buckets, chain at unit+0xE4
-    uint8_t** unitHashN;    // +0x10A608, stride 0x80 per type (4 types)
+    uint8_t** unitHashN;    // +0x10A608, stride 0x200 per type
     uint32_t* slot484;      // +0x11C484 [4]
     uint32_t* g854;         // +0x119854 DAT_6fbc9854
     uint32_t  tick;         // +0x11C3B8 DAT_6fbcc3b8
     uint32_t* g834;         // +0x11B834 (b834,b854,b858,b864 as [0..3])
+    const uint8_t* g9780;   // +0x119780: the bytes holding the 978e dword, the 9781 byte and the 9786 dword (only 0x82F50 reads it)
 };
 
 template <class T> static T rd(const uint8_t* p, size_t o) { T v; memcpy(&v, p + o, sizeof v); return v; }
@@ -186,16 +187,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82e10(const D2cGlob82* g, const D
     uint8_t* u = findUnit(g, e, rd<uint32_t>(esi, 4), 4);
     if (!u) return;
     int32_t m = rd<int32_t>(u, 0x10);
-    if (m == 2) d2_client_82a00(g, e, esi, loc);
-    else if (m == 4) d2_client_82b20(g, e, esi, loc);
+    if (m == 2) e->fn(0x82a00, P(esi), P(loc), 0, 0);        // stdcall: EAX = pkt, [esp+4] = block
+    else if (m == 4) e->fn(0x82b20, P(esi), P(loc), 0, 0);   // stdcall: pkt, block
 }
 
 // 1.13c D2Client+0x82F50   (EAX = pkt: +1 type byte, +2 id)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82f50(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* eax,
                                                     uint32_t (*lookup)(uint32_t id, const void* bucket, uint32_t type)) {
-    uint32_t t = rd<uint8_t>(eax, 1);
-    uint8_t* u = (uint8_t*)(U)e->fn(0xa4e20, rd<uint32_t>(eax, 2), P(g->unitHashN) + t * 0x80, t, 0);
     (void)lookup;
+    uint32_t t = rd<uint8_t>(eax, 1);
+    uint8_t* u = (uint8_t*)(U)e->fn(0xa4e20, rd<uint32_t>(eax, 2), P(g->unitHashN) + t * 0x200, t, 0);
     if (!u || u != g->player) return;
     uint32_t h = rd<uint32_t>(u, 0x60);
     uint8_t* it = (uint8_t*)e->ord(11017, h, 0, 0, 0);
@@ -204,14 +205,15 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_82f50(const D2cGlob82* g, const D
     e->ord(10466, h, 0, 0, 0);
     e->ord(11017, h, 0, 0, 0);
     e->fn(0x162d0, 0, 0, 0, 0);
-    e->fn(0xa6ef0, P(g->unitHashN) + rd<uint32_t>(it, 0) * 0x80, id & 0x7f, id, rd<uint32_t>(it, 0));
-    // DAT_6fbc978e / 9781 / 9786: caller-pinned trio, passed as u->... via fn seam
-    e->fn(0x47ab0, id, 0, 0, 0);
+    e->fn(0xa6ef0, P(g->unitHashN) + rd<uint32_t>(it, 0) * 0x200, id & 0x7f, id, rd<uint32_t>(it, 0));
+    // DAT_6fbc978e != 0 && DAT_6fbc9781 == 1 && id == DAT_6fbc9786
+    if (rd<uint32_t>(g->g9780, 0xe) != 0 && rd<uint8_t>(g->g9780, 1) == 1 && id == rd<uint32_t>(g->g9780, 6))
+        e->fn(0x47ab0, 0, 0, 0, 0);
 }
 
-// 1.13c D2Client+0x833F0   (param_1 = pkt, param_2 = loc or null, EBX = hi, ESI = flag)
+// 1.13c D2Client+0x833F0   (stdcall 4: pkt, loc or null, a3 = low word, flag = esi; EBX = hi)
 extern "C" EMSCRIPTEN_KEEPALIVE U d2_client_833f0(const D2cGlob82* g, const D2cEnv82* e, const uint8_t* p1,
-                                                 uint32_t* loc, uint32_t ebx, int32_t esi) {
+                                                 uint32_t* loc, uint32_t a3, uint32_t ebx, int32_t esi) {
     uint32_t lbuf[5];
     int32_t n = rd<uint8_t>(p1, 2) - 0xd;
     if (!loc) { e->ord(11105, P(p1 + 0xd), n, 0, P(lbuf)); loc = lbuf; }
@@ -226,8 +228,8 @@ extern "C" EMSCRIPTEN_KEEPALIVE U d2_client_833f0(const D2cGlob82* g, const D2cE
         wr<uint32_t>(u, 0xC8, fl);
         wr<uint32_t>(u, 0, 4); wr<uint32_t>(u, 4, v6); wr<uint32_t>(u, 0xC, id);
         wr<uint32_t>(u, 0xD4, 0); wr<uint32_t>(u, 8, 0);
-        if (hi || (uint16_t)P(p1)) {
-            iVar9 = (int32_t)e->fn(0xa5a60, hi, 0, 0, 0);
+        if (hi || (a3 & 0xffff)) {
+            iVar9 = (int32_t)e->fn(0xa5a60, hi, a3 & 0xffff, 0, 0);
             U c = e->ord(10826, (U)iVar9, 0, 0, 0);
             wr<uint8_t>(u, 0x18, (uint8_t)e->ord(10459, c, 0, 0, 0));
             wr<uint32_t>(u, 0x1C, g->tick);
@@ -243,17 +245,17 @@ extern "C" EMSCRIPTEN_KEEPALIVE U d2_client_833f0(const D2cGlob82* g, const D2cE
             e->ord(10614, 0, 0, 0, 0);
         }
         e->ord(10445, P(u), 0, 0, 0);
-        e->fn(0x82820, hi, (uint16_t)P(p1), 0, 0);
-        e->fn(0x14940, 0, 0, 0, 0);
-        ret = e->fn(0x66950, 0, 0, 0, 0);
+        e->fn(0x82820, hi, a3 & 0xffff, rd<uint8_t>(p1, 2) - 0xd, 0);
+        e->fn(0x66950, 0, 0, 0, 0);
+        ret = e->fn(0xa7360, (U)u, 0, 0, 0);
     }
     if (e->ord(11145, ret, P(p1 + 0xd), (U)esi, 0x60 /* + &local24 */)) {
         unlinkUnit(g, e, rd<uint32_t>(p1, 4));
         return 0;
     }
-    if (e->ord(10197, rd<uint32_t>(p1, 0xC), 2, 0, 0)) {
+    if (e->ord(10197, rd<uint32_t>((uint8_t*)loc, 0xC), 2, 0, 0)) {
         e->ord(10977, ret, 2, 0, 0);
-        if (esi && !e->ord(10202, ret, 0x10, 0xfe, 0)) e->fn(0x4940, 0, 0, 0, 0);
+        if (esi && !e->ord(10202, ret, 0x10, 0xfe, 0)) e->fn(0x14940, rd<uint32_t>(p1, 4), 0, 0, 0);
     }
     (void)local24;
     return ret;

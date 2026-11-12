@@ -104,7 +104,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_port_d2game_b9f20(uint8_t* game, void* unit, co
 }
 
 // 1.13c D2Game+0xBC050  (self = in_EAX, ctx = param_1)
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_bc050(void* self, uint8_t* ctx, const D2GameBatchB59Env* env) {
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_BC050(void* self, uint8_t* ctx, const D2GameBatchB59Env* env) {
     O(10331, rd32(ctx, 4), 0, 0, 0, 0);
     uint32_t r = env->sub21280();
     if (r) env->sub54130(r, self, P(3), 0x3F11);
@@ -119,13 +119,13 @@ static uint32_t nudge(uint8_t* ctx, uint32_t off, int32_t dx, int32_t dy, const 
             O(10141, u, (uintptr_t)((uint8_t*)P(q) + off), 0, 0, 0);
             wr32(P(q), off, rd32(P(q), off) + dx);
             wr32(P(q), off + 4, rd32(P(q), off + 4) + dy);
-            d2_fn_d2game_bc050(nullptr, ctx, env);
+            d2_fn_d2game_BC050(nullptr, ctx, env);
         }
     }
     return 0;
 }
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_bc4a0(uint8_t* ctx, const D2GameBatchB59Env* env) { return nudge(ctx, 0x34, 0x20, 0x10, env); }
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_bc510(uint8_t* ctx, const D2GameBatchB59Env* env) { return nudge(ctx, 0x2C, -0x27, 0x21, env); }
-EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_bc580(uint8_t* ctx, const D2GameBatchB59Env* env) { return nudge(ctx, 0x24, -0xC, -0x34, env); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BC4A0(uint8_t* ctx, const D2GameBatchB59Env* env) { return nudge(ctx, 0x34, 0x20, 0x10, env); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BC510(uint8_t* ctx, const D2GameBatchB59Env* env) { return nudge(ctx, 0x2C, -0x27, 0x21, env); }
+EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_BC580(uint8_t* ctx, const D2GameBatchB59Env* env) { return nudge(ctx, 0x24, -0xC, -0x34, env); }
 
 }

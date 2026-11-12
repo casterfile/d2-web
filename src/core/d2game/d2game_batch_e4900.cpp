@@ -14,7 +14,7 @@ static inline void     wr8(uintptr_t p, uint32_t o, uint8_t v) { ((uint8_t*)p)[o
 
 struct D2GameBatchE4900Env {
     uintptr_t (*ord)(uint32_t n, uintptr_t a, uintptr_t b, uintptr_t c);       // D2Common ordinal n, up to 3 args
-    void      (*sub8A3E0)(const void* buf, uint32_t len);                     // 0x8A3E0 send packet
+    void      (*sub8A3E0)(uintptr_t client, const void* buf, uint32_t len);  // 0x8A3E0 send packet (eax = client)
     void      (*subE34D0)(uintptr_t unit);                                    // 0xE34D0
     void      (*sub354F0)(uintptr_t unit, uintptr_t game);                    // 0x354F0
     void      (*sub8EA80)(uintptr_t game, uintptr_t unit, uint32_t one, uint32_t frame, uint32_t a, uint32_t b, uint32_t c); // 0x8EA80
@@ -67,8 +67,9 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_E4A50(uint32_t p1, uint8_t p2,
     (void)p1;
     uintptr_t p = rd32(p3, 0xc);
     uint8_t pkt[6] = { 0x5d, 0x10, rd8(eax, 0x14), p2, 0, 0 };
-    if (p && rd32(p, 0) == 0) O(10920, p, 0, 0);
-    env->sub8A3E0(pkt, 6);
+    uintptr_t client = 0;   // eax into the send: the ordinal's result when it ran
+    if (p && rd32(p, 0) == 0) client = rd32(O(10920, p, 0, 0), 0x9c);
+    env->sub8A3E0(client, pkt, 6);
 }
 
 // 1.13c D2Game+0xE5A60   game = unaff_EDI

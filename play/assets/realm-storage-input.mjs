@@ -66,6 +66,8 @@ export function realmInventoryClick(ctx, x, y, button = 0) {
   const slot = panel.slotAt(x, y, W, H, snapshot);
   if (button === 0 && panel.weaponTabAt(x, y, W, H)) { ctx.onWeaponTab?.(); ri.swapWeapons(); return true; }
   if (button === 2) { const item = panel.itemAt(x, y, W, H, snapshot) || slot?.item; if (item && !cursorId) ri.useItem(item.id); return true; }
+  // The identify cursor (D2Client [0x11B864] == 6): a press on an item sends 0x27 for it, any other press does nothing (0x95FE0, 0x96AA0).
+  if (button === 0 && ctx.armed) { const item = panel.itemAt(x, y, W, H, snapshot) || slot?.item; if (item) ri.useOnItem(item.id, ctx.armed); return true; }
   if (!cursorId) {
     const item = panel.itemAt(x, y, W, H, snapshot);
     if (item) ri.lift(item.id); else if (slot?.item) ri.unequip(slot.bodyLoc);

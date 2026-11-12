@@ -45,8 +45,8 @@ uint32_t Storm_GetModuleFileName(char* buf, uint32_t n) {
     g_modFile(buf, n);
     return (uint32_t)strlen(buf);
 }
-void* Storm_CreateEvent() { return nullptr; }
-void* Storm_CreateThread(uint32_t (*)(void*)) { return nullptr; }
+void* Storm_CreateEvent() { return (void*)(uintptr_t)1; }   // no host event: a non-null token, as a created handle is
+void* Storm_CreateThread(uint32_t (*)(void*)) { return (void*)(uintptr_t)1; }   // no host thread: a non-null token, so the start-once test holds
 void Storm_SetThreadPriority(void*, int32_t) {}
 }  // namespace
 

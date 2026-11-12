@@ -28,6 +28,24 @@ test('skill select 0x3c, left hand: sign-extended word 0xFFFF8005, owner -1', ()
   same(packets.selectSkill(5, true, 0xffffffff), '3c 05 80 ff ff ff ff ff ff');
 });
 
+// Skill-hotkey bind 0x51: retail's D2Client 0x14910 with AL=0x51, ECX = ((slot&15)<<16)|(left?0x8000:0)|(skill&0x7FFF), EDX = owner.
+// The record (vectors/d2client/fn/14910.hotkey.bin, private store) holds FNV(size 9, bytes) of the emitted packet, not the bytes;
+// the hashes below are that record's, and fnv9 recomputes them from the bytes the builder writes.
+const fnv9 = (bytes) => { let h = Math.imul(0x811C9DC5 ^ bytes.length, 0x01000193) >>> 0; for (const x of bytes) h = Math.imul(h ^ x, 0x01000193) >>> 0; return h >>> 0; };
+test('skill hotkey bind 0x51: slot 3 skill 5 right, slot 3 skill 5 left, skill 0x96 and Whirlwind 0x97 left (retail 14910 record)', () => {
+  const cases = [
+    [packets.bindHotkey(3, 5, false), '51 05 00 03 00 ff ff ff ff', 0x244A360D],
+    [packets.bindHotkey(3, 5, true), '51 05 80 03 00 ff ff ff ff', 0x0BE5C38D],
+    [packets.bindHotkey(0, 0x96, true), '51 96 80 00 00 ff ff ff ff', 0xCE13C8F5],
+    [packets.bindHotkey(0, 0x97, true), '51 97 80 00 00 ff ff ff ff', 0xE39E08D4],
+    [packets.bindHotkey(15, 0x1234, false, 7), '51 34 12 0f 00 07 00 00 00', 0x108CDEE1],   // blind holdout
+  ];
+  for (const [bytes, hex8, hash] of cases) {
+    same(bytes, hex8);
+    assert.equal(fnv9(bytes), hash);
+  }
+});
+
 test('drop gold 0x50: hero guid then amount 500', () => {
   same(packets.dropGold(0x01020304, 500), '50 04 03 02 01 f4 01 00 00');
 });

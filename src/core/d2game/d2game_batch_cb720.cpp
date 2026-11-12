@@ -67,10 +67,11 @@ struct D2GameBatchCB720Env {
 extern "C"
 EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cb720(void* unit, const D2GameBatchCB720Env* env)
 {
-    env->ordinal10973();
+    const uint32_t bias = env->ordinal10973();          // stat 8: added to the product before the x100
     const int32_t iVar1 = env->ordinal10186();
     uint32_t uVar2 = env->ordinal10871();
     if (uVar2 == 0 || iVar1 == 0 || unit == nullptr) return uVar2 & 0xFFFFFF00u;
+    const uint32_t stat6a = uVar2;                      // stat 0x6a: the value 0xAB74 is asked about
 
     uVar2 = rd32(unit, 4);
     const int32_t count = (int32_t)rd32(env->dataTables, 0xBC8);
@@ -87,24 +88,24 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cb720(void* unit, const D2GameBatchCB720En
     const int32_t s1 = (int32_t)env->ordinal10973();
     const int32_t s2 = (int32_t)env->ordinal10973();
     void* iVar5 = env->funcDF780();
-    const int32_t iVar6 = env->ordinal10959(0);
+    const int32_t iVar6 = env->ordinal10959(stat6a);
 
     const int32_t base = (int32_t)((uint32_t)iVar6 - rd32(iVar5, 0xA8));
     const int32_t scaled = (int32_t)(((uint32_t)s1 + 100u) * (uint32_t)iVar7) / 100;
     const int32_t mult = s2 + scaled;
-    const uint32_t prod = (uint32_t)base * (uint32_t)mult * 100u;
+    const uint32_t prod = ((uint32_t)base * (uint32_t)mult + bias) * 100u;
     const uint32_t uVar3 = (uint32_t)((int32_t)prod / iVar1);
     if (100 < (uint8_t)uVar3) return 100;
     return uVar3 & 0xFF;
 }
 
-// FUN_6fceb840: the companion stat percentage. The unit is in EAX and the added bias word in EBP
-// (both register parameters). Fatal 0xA2A without a unit; the denominator is Ordinal_10913 >> 8.
+// FUN_6fceb840: the companion stat percentage. The unit is in EAX; the added bias word is the first
+// Ordinal_10973 result (a stack local). Fatal 0xA2A without a unit; the denominator is Ordinal_10913 >> 8.
 // 1.13c D2Game+0xCB840
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cb840(void* unit, int32_t ebpValue, const D2GameBatchCB720Env* env)
+EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cb840(void* unit, const D2GameBatchCB720Env* env)
 {
-    env->ordinal10973();
+    const int32_t ebpValue = (int32_t)env->ordinal10973();
     const int32_t iVar2 = env->ordinal10913();
     uint32_t uVar3 = env->ordinal10871();
     if (uVar3 == 0 || (iVar2 >> 8) == 0) return uVar3 & 0xFFFFFF00u;

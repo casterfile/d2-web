@@ -2693,8 +2693,9 @@ static int attachSessionPlayerAt(D2ActiveRoomStrc* room, int x, int y, D2UnitStr
         D2DrlgCoordsStrc joinRoom = {};
         DUNGEON_GetRoomCoordinates(room, &joinRoom);
         D2GAME_PACKETS_SendPacket0x07_6FC3D120(g_targetClient, DUNGEON_GetLevelIdFromRoom(room), (uint16_t)joinRoom.nTileXPos, (uint16_t)joinRoom.nTileYPos);
-        D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
+        // The unit is named (0x59) before it is selected (0x0B): the stock server's order, and the one the client's join scan reads.
         sub_6FC3D1F0(g_targetClient, player->dwUnitId, (uint8_t)player->dwClassId, g_targetClient->szName, (int16_t)CLIENTS_GetUnitX(player), (int16_t)CLIENTS_GetUnitY(player));
+        D2GAME_SendPacket0x0B_ClientUnit(g_targetClient, player);
         D2GAME_PACKETS_SendPacket0x15_6FC3D0D0(g_targetClient, 0x15u, 0, player->dwUnitId, CLIENTS_GetUnitX(player), CLIENTS_GetUnitY(player), 1);
     } else g_sessionJoinLoadLength = 0;
     g_sessionJoinRooms.clear();

@@ -23,52 +23,66 @@ struct D2C9f750Env {
     void*   (*get_text)(void);                         // Ordinal_10003
     void    (*send_packet)(const uint8_t* p13);        // 0x143E0
     void    (*fn_f5fb0)(void);                         // 0x2F5FB0
-    void    (*free_dialog)(void);                      // 0x53D20
+    void    (*free_dialog)(void*);                     // 0xA3D20 (EAX = the dialog)
     void    (*cleanup_f950)(void);                     // 0x9F950
-    void    (*free_char)(void*);                       // 0x6FAECA00
+    void    (*free_char)(uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t esi);  // 0x3CA00 (EAX = Ordinal_10048 result, ECX/EDX/ESI = the table entry's +4/+8/+0)
     void    (*reset_72790)(int, int, int);             // 0xC2790
     void    (*free_handle)(void*);                     // Ordinal_10065
     void    (*free_10043)(int, int);                   // Ordinal_10043
-    int     (*ord_10048)(void);
-    void    (*ord_11017)(void*);
+    uint32_t (*ord_10048)(void);
+    void    (*ord_11017)(uint32_t);
     void    (*dialog_cb_9fd70)(void);                  // 0x9FD70
 };
 
-// 1.13c D2Client+0x9F830
-// st = bb214 state, unitSel = bbfc? (DAT_6fbcbbfc, unit; id at +0xC), dlgOut = bb224, flag210 = bb210,
-// v21c/v220 = bb21c/bb220. Returns 1 when it opened the dialog.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9f830(int32_t* st, const uint8_t* unitSel, void** dlgOut, int32_t flag210,
-                                                         int32_t v21c, int32_t v220, const D2C9f750Env* env) {
+// 1.13c D2Client+0x9F830 (no arguments; every input is a global). st = bb214, unitId = &bbfc->id (+0xC; null when bbfc is 0),
+// dlgOut = bb224, flag210 = bb210, v21c/v220 = bb21c/bb220. Seams carry retail's register/stack arguments:
+//   0x88A70 (EBX = 2, four zero stack words), 0xA3E40 (stdcall, the 11 stack words in block[0..10]; returns the popup),
+//   0xD1EC (ECX = 0xD19, stack 0xF,0,1,0,0; returns the text), 0xA36F0 (ECX = popup, EAX = 0, one stack word = the text),
+//   0x143E0 (17-byte packet, EBX = 17), 0x45FB0 (ECX = bb220). Returns 1 when it opened the popup.
+struct D2C9f830Env {
+    void     (*fn_88a70)(uint32_t ebx);
+    void*    (*make_dialog)(const uint32_t* block11);
+    uint32_t (*get_text)(uint32_t ecx, const uint32_t* stack5);
+    void     (*dialog_text)(void* ecx, uint32_t eax, uint32_t text);
+    void     (*send_packet)(const uint8_t* p17);
+    void     (*fn_45fb0)(uint32_t ecx);
+    void     (*fatal)(int msgId);
+};
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9f830(int32_t* st, const uint32_t* unitId, void** dlgOut, int32_t flag210,
+                                                         int32_t v21c, int32_t v220, const D2C9f830Env* env) {
     if (*st != 2) return 0;
-    env->fn_88a70(0, 0, 0, 0);
-    *dlgOut = env->make_dialog(0x96, 0x82, nullptr, 0, 1, 0, 1, 0, 0);
+    env->fn_88a70(2);
+    static const uint32_t kBlock[11] = { 0x96, 0x82, 0x9F430 /* RVA of the popup callback */, 0, 1, 0, 1, 0, 0, 0, 1 };
+    *dlgOut = env->make_dialog(kBlock);
     if (!*dlgOut) { env->fatal(0x529); return 0; }
     reinterpret_cast<uint32_t*>(*dlgOut)[0x17] = 0;
-    env->dialog_init(*dlgOut, env->get_text(), 0xf, 0, 1, 0, 0);
+    static const uint32_t kText[5] = { 0xf, 0, 1, 0, 0 };
+    const uint32_t text = env->get_text(0xd19, kText);
+    env->dialog_text(*dlgOut, 0, text);
     *st = 3;
     if (flag210 == 0) {
-        int32_t id = -1; if (unitSel) std::memcpy(&id, unitSel + 0xC, 4);
-        
+        const uint32_t id = unitId ? *unitId : 0xffffffffu, three = 3;
         // retail's packet is 17 bytes: 'D', id, v21c, v220, 3
         uint8_t q[17]; q[0] = 'D'; std::memcpy(q + 1, &id, 4); std::memcpy(q + 5, &v21c, 4); std::memcpy(q + 9, &v220, 4);
-        int32_t three = 3; std::memcpy(q + 13, &three, 4);
+        std::memcpy(q + 13, &three, 4);
         env->send_packet(q);
         return 1;
     }
-    env->fn_f5fb0();
+    env->fn_45fb0((uint32_t)v220);
     return 1;
 }
 
 // 1.13c D2Client+0x9F9E0
-// unitSel = DAT_6fbcbbfc (unit; +0x60 is the arg of Ordinal_11017). tab = 8 entries x 0xC bytes at ecbc, the
-// first dword of each entry a char to free.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f9e0(int32_t* st, void* unitSel60, void** dlg, void** chars, int32_t* bcc2fc, const D2C9f750Env* env) {
+// unit60 = *(bbfc+0x60), hasUnit = bbfc != 0 (Ordinal_11017 takes that word). tab = the 8 entries x 3 dwords at RVA 0xDECB8
+// (dword 0 = ESI, 1 = ECX, 2 = EDX of the 0x3CA00 call, whose EAX is the Ordinal_10048 result). dlg = bb224, bcc2fc = 0x11C2FC.
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9f9e0(int32_t* st, uint32_t unit60, bool hasUnit, void** dlg, const uint32_t* tab, int32_t* bcc2fc, const D2C9f750Env* env) {
     *st = 0;
-    if (unitSel60) env->ord_11017(unitSel60);
+    if (hasUnit) env->ord_11017(unit60);
     env->cleanup_f950();
-    if (env->ord_10048() == 0) { env->fatal(0x18c); return; }
-    for (uint32_t o = 0; o < 0x60; o += 0xC) env->free_char(chars[o / 0xC]);
-    if (*dlg) { env->free_dialog(); *dlg = nullptr; }
+    const uint32_t h = env->ord_10048();
+    if (h == 0) { env->fatal(0x18c); return; }
+    for (uint32_t o = 0; o < 8; ++o) env->free_char(h, tab[o * 3 + 1], tab[o * 3 + 2], tab[o * 3]);
+    if (*dlg) { void* d = *dlg; env->free_dialog(d); *dlg = nullptr; }
     env->reset_72790(0xe, 1, 0);
     *bcc2fc = 0;
 }

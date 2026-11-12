@@ -16,9 +16,7 @@
 #include <emscripten.h>
 
 static inline uint8_t rd8(const void* p, uint32_t o) { return ((const uint8_t*)p)[o]; }
-static inline uint16_t rd16(const void* p, uint32_t o) { uint16_t v; std::memcpy(&v, (const uint8_t*)p + o, 2); return v; }
 static inline uint32_t rd32(const void* p, uint32_t o) { uint32_t v; std::memcpy(&v, (const uint8_t*)p + o, 4); return v; }
-static inline void wr16(void* p, uint32_t o, uint16_t v) { std::memcpy((uint8_t*)p + o, &v, 2); }
 static inline void wr32(void* p, uint32_t o, uint32_t v) { std::memcpy((uint8_t*)p + o, &v, 4); }
 static inline void* rdptr(const void* p, uint32_t o) { void* v; std::memcpy(&v, (const uint8_t*)p + o, sizeof v); return v; }
 
@@ -76,7 +74,7 @@ struct D2GameBatch15Env {
     void*    (*drlgFindRoom)(void* segment, uint32_t x, uint32_t y);
     // 0x4CB80 frees the DRLG room found by 0x10053.
     void     (*freeDrlgRoom)(void* game, void* room);
-    // 0x69240 returns the per-client update record used by 0xCC030.
+    // 0x49240 returns the per-client update record used by 0xCC030.
     void*    (*getUpdateRecord)(void);
     // Ordinal_10973(unit, stat, param) -- the trailing param is 0 when Ghidra shows none.
     uint32_t (*getStat)(void* unit, uint32_t stat, uint32_t param);
@@ -310,112 +308,7 @@ EMSCRIPTEN_KEEPALIVE void d2_game_e1570(void* game, void* unit, const D2GameBatc
     env->getInteract(game, rd32(unit, 0x98));                            // 0xE03A0
 }
 
-// 1.13c D2Game+0xCC030
-// FUN_6fcec030: the client/player update sync (client in the argument, player in EAX). Requires a
-// player whose client (playerData+0x9C) exists and a 0x69240 update record. The distance check is
-// (|record.x - stat6 >> 8| * 100) / (unitValue >> 8); below 10 with the extra record flag clear it
-// returns 0 (also for x == 0 on a non-zero record x). Otherwise 0x21100/0x21130 flush, client+0x2C
-// is freed (Ordinal_10983/10764), stat 8/10/13 are re-read and the position/animation words are
-// compared; a match with the near-origin tests (|x-0xE| < 2 and |y - client| < 2) bumps the counter
-// or returns without sending, else 0xAB750/0xAB7F0/0xAB8C0 pick the packet. The record is then
-// updated and 0xABE10/0xABDA0 send the two changed stat blocks.
-extern "C"
-EMSCRIPTEN_KEEPALIVE uint32_t d2_game_cc030(void* client, void* player, const D2GameBatch15Env* env)
-{
-    if (player == nullptr || client == nullptr || rd32(player, 0x00) != 0) return 0;
-
-    void* playerData = env->getPlayerData(player);         // Ordinal_10920
-    if (rdptr(playerData, 0x9C) == nullptr) return 0;
-
-    void* record = env->getUpdateRecord();                 // 0x69240
-    if (record == nullptr) return 0;
-
-    const uint32_t stat6 = env->getStat(client, 6, 0);     // Ordinal_10973
-    const uint32_t unitValue = env->getUnitValue(client);  // Ordinal_10913
-    if ((unitValue >> 8) < 1) return 0;
-
-    int32_t distance = (int32_t)(uint32_t)rd16(record, 4) - (int32_t)(stat6 >> 8);
-    if (distance < 0) distance = -distance;
-    // The decompile's stack flag at [esp+0x10] is never written before this test; the real
-    // condition is the percentage/origin pair.
-    if ((distance * 100) / (int32_t)(unitValue >> 8) < 10 || ((stat6 >> 8) == 0 && rd16(record, 4) != 0)) {
-        return 0;
-    }
-
-    env->unitUpdate0(client);                              // 0x21100
-    env->unitUpdate1(client);                              // 0x21130
-    const uint32_t block = rd32(client, 0x2C);
-    if (block != 0) {
-        env->freeClientBlock(block);                       // Ordinal_10983
-        env->sentBlock(block);                             // Ordinal_10764
-    }
-
-    uint32_t stat8 = 8;
-    env->getStat(client, 8, 0);                            // Ordinal_10973
-    const uint32_t stat10 = env->getStat(client, 10, 0);// Ordinal_10973, no trailing param
-    const uint8_t byteArg = (uint8_t)(uintptr_t)client;
-    env->getStat(client, 0, 0);                            // Ordinal_10973
-    const uint32_t stat13 = env->getStat(client, 13, 0);// Ordinal_10973
-
-    const uint32_t sendA = env->sendA();                   // 0xEB840
-    const uint8_t cVar10 = (uint8_t)sendA;
-    const uint32_t sendB = env->sendB();                   // 0xEB720
-    const uint8_t cVar1 = (uint8_t)sendB;
-    const uint16_t origin = (uint16_t)(uintptr_t)client;
-
-    if (rd8(record, 10) == cVar10 && rd8(record, 11) == cVar1) {
-        if (rd16(record, 4) == 0 && rd16(record, 6) == stat8) {
-            if (rd16(record, 8) == stat8) {
-                if (rd32(record, 0) < 4) {
-                    wr32(record, 0, rd32(record, 0) + 1);
-                    goto store;
-                }
-                int32_t d = (int32_t)rd16(record, 12) - 0xE;
-                if (d < 0) d = -d;
-                if (d < 2) {
-                    d = (int32_t)rd16(record, 14) - (int32_t)origin;
-                    if (d < 0) d = -d;
-                    if (d < 2) {
-                        wr32(record, 0, rd32(record, 0) + 1);
-                        goto store;
-                    }
-                }
-            }
-            env->packetA();                                // 0xAB750
-        } else {
-            env->packetB();                                // 0xAB7F0
-        }
-    } else {
-        env->packetC();                                    // 0xAB8C0
-    }
-
-    {   // reset the record's tracking words
-        uint32_t r = (uint32_t)env->sendA();
-        (void)r;
-    }
-    wr16(record, 12, 0x0E);
-    wr16(record, 14, origin);
-    wr16(record, 16, 0);
-    wr16(record, 18, byteArg);
-    wr32(record, 0, 0);
-
-store:
-    if (stat8 != rd32(record, 20)) {
-        env->packetSetA(0, stat8);                         // 0xABE10
-        wr32(record, 20, stat8);
-    }
-    if (stat13 != rd32(record, 24)) {
-        env->packetSetB(0, stat13);                        // 0xABDA0
-        wr32(record, 24, stat13);
-    }
-    wr32(record, 8, stat8);
-    wr16(record, 6, (uint16_t)stat8);
-    ((uint8_t*)record)[10] = cVar10;
-    wr16(record, 4, 0);
-    ((uint8_t*)record)[11] = cVar1;
-    (void)stat10;
-    return 1;
-}
+// D2Game 1.13c 0xCC030: the retail-layout port is src/core/d2game/d2game_cc030.cpp (EAX = player, ECX = unit, stack flag).
 
 // ---- FUNCTION-mode probe for 0x56740 (src/core/fn/d2game_56740.cpp): each seam logs through HookEnv as the capture's hook recorder does and
 // returns the scripted value; the quest-node walk reads the real blob.

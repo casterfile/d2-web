@@ -13,5 +13,5 @@ extern "C" void d2c_port_7bf40(const uint8_t* esi, const D2c7bf40Env& e) {
     if (!esi) return;
     uint32_t head; memcpy(&head, esi, 4);
     e.freeList(head);
-    e.fogFree((uint32_t)(uintptr_t)esi, 0x84BDC, 0x68A, 0);
+    e.fogFree((uint32_t)(uintptr_t)esi, 0xD4BDC, 0x68A, 0);
 }

@@ -21,7 +21,7 @@ inline uint32_t tagRva(const char* s) {
         { "AUAUDIOSTREAM", 0x51C8C }, { "AUCMDDEF", 0x51D0C }, { "AUVIDEOREC", 0x51D24 }, { "AUBITMAPREC", 0x51D54 }, { "AUSGDIOBJ", 0x51D74 }, { "AU_PLAYERNAME", 0x51DA4 }, { "AUMESSAGE", 0x51DF4 },
         { "AV_TSHashObjectChunk_URGN_VH", 0x51B88 },
         { "AUUSEREVENT", 0x51D8C }, { "AUCONNREC", 0x51DC0 }, { "AUPROVIDERINFO", 0x51DD8 },
-        { "AUFILEREC", 0x51CC0 }, { "AUEVENTREC", 0x51CA8 },
+        { "AUFILEREC", 0x51CC0 }, { "AUEVENTREC", 0x51CA8 }, { "AUREQUEST", 0x51CD8 }, { "AUARCHIVEREC", 0x51CF0 },
         { "AUSTREAM", 0x515B8 }, { "SBLT.CPP", 0x469D8 }, { "SCOMP.CPP", 0x474A8 },
     };
     for (const auto& e : t) {

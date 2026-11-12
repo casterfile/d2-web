@@ -20,8 +20,9 @@ for (const [first, stem, intros, gossips, plain] of ROWS) {
   for (let n = 1; n <= plain; n++) handles.push(`${stem}_gossip_${n}`);
   handles.forEach((handle, i) => { NPC_TOWN_VOICE[first + i] = handle; });
 }
-// Jerhyn's run does not line up one-to-one (3 introduction strings, 2 introduction sounds): 255 is left silent.
-Object.assign(NPC_TOWN_VOICE, { 253: 'jerhyn_act2_intro', 254: 'jerhyn_act2_intro_more' });
+// Jerhyn's run does not line up one-to-one (3 introduction strings, 2 introduction sounds). Retail's selector table
+// gives 255 and 256 the same Sounds row (jerhyn_act2_gossip_1), so 255 speaks it too.
+Object.assign(NPC_TOWN_VOICE, { 253: 'jerhyn_act2_intro', 254: 'jerhyn_act2_intro_more', 255: 'jerhyn_act2_gossip_1' });
 for (let n = 1; n <= 7; n++) NPC_TOWN_VOICE[255 + n] = `jerhyn_act2_gossip_${n}`;
 // Retail omits Alkor's fourth gossip string (507): it has no selector entry.
 delete NPC_TOWN_VOICE[507];

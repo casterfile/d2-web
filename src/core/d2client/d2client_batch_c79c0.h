@@ -28,3 +28,12 @@ uint32_t sub_C8510(const Env& e, P a, int32_t cls);
 bool sub_C8620(const Env& e, P u, uint32_t a, int32_t cls, uint32_t c);
 uint32_t sub_C8710(const Env& e, int32_t sk, uint32_t p1, int32_t cls, P p3, uint32_t p4, uint32_t p5);
 }
+// Retail's call sites: registers and stack words are explicit parameters (pointers are retail's 32-bit words);
+// every callee goes through FnCallees.
+#include "fn_callees.h"
+namespace d2client_batch_c79c0_seam {
+void sub_C7B00(FnCallees& s, uint32_t unit /*eax*/);
+void sub_C7C80(FnCallees& s, uint32_t unit /*eax*/, uint32_t n /*ecx*/, uint32_t k /*stack*/);
+void sub_C7FB0(FnCallees& s, uint32_t unit /*stack*/);
+uint32_t sub_C8220(FnCallees& s, uint32_t a /*eax*/, uint32_t b /*ecx*/, uint32_t c /*edx*/, uint32_t io /*esi*/);
+}

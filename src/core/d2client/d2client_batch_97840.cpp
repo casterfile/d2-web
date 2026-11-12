@@ -33,6 +33,8 @@ static uint32_t g_screen_h;           // +0x0F9E14 DAT_6fba9e14
 static int32_t  g_view_off;           // +0x11C418
 static uint32_t g_view_mode;          // +0x11C414
 static uint32_t g_clr_3dc, g_clr_3e0, g_clr_3f8, g_clr_3fc;  // +0x11C3DC/3E0/3F8/3FC
+static uint32_t g_ba9e18, g_cc3c4;   // +0x0F9E18 / +0x11C3C4 (the 0x8A4D0 layout call's EAX / ESI)
+static uint32_t g_edi971d;          // +0x11971D (unaligned dword, EDI of the 0x47B20 call)
 static uint32_t g_str_bef4;           // +0x11BEF4
 static uint16_t g_str_buf[0x100];     // +0x11CC38 (Unicode string)
 static uint32_t g_hud_x, g_hud_y, g_hud_cel, g_hud_alt;  // +0x11B9A0 / +0x11B9A4 / +0x11BED4 / +0x11BEF0
@@ -45,6 +47,28 @@ extern "C" uint32_t* d2_client_97840_g(uint32_t rva) {
     switch (rva) {
     case 0x11BC34: return &g_hud_state;
     case 0x11BC78: return &g_hud_handle;
+    case 0x0FAD80: return g_panel_open;
+    case 0x0DD5D0: return &g_panel_count;
+    case 0x0DD538: return g_panel_tbl;
+    case 0x119854: return &g_cl_ready;
+    case 0x113A68: return &g_cl_lock;
+    case 0x119721: return &g_cl_flag9721;
+    case 0x11971D: return &g_edi971d;
+    case 0x11BBFC: return &g_focus;
+    case 0x11C4D4: return &g_unit_chain;
+    case 0x10A808: return g_unit_hash;
+    case 0x0DBC48: return &g_screen_w;
+    case 0x0F9E14: return &g_screen_h;
+    case 0x0F9E18: return &g_ba9e18;
+    case 0x11C3C4: return &g_cc3c4;
+    case 0x11C418: return (uint32_t*)&g_view_off;
+    case 0x11C414: return &g_view_mode;
+    case 0x11C3DC: return &g_clr_3dc;
+    case 0x11C3E0: return &g_clr_3e0;
+    case 0x11C3F8: return &g_clr_3f8;
+    case 0x11C3FC: return &g_clr_3fc;
+    case 0x11BEF4: return &g_str_bef4;
+    case 0x11CC38: return (uint32_t*)g_str_buf;
     default: return nullptr;
     }
 }
@@ -62,17 +86,16 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_97840(const D2cClientEnv* e) {
 
 // Tail + prelude common to both toggles. sw: index of the panel word being toggled (0x1D / 0x1C).
 static bool panel_core(const D2cClientEnv* e, uint32_t sw, uint32_t modeoff, bool set_to_one,
-                       const void* notify, bool close_extra, uint32_t* entry_state) {
+                       uint32_t notify, uint32_t code, bool close_extra, bool gate_on_closed) {
     uint32_t old = g_panel_open[sw];
-    *entry_state = old;
-    if (g_panel_open[sw] == 0) {
+    if (!gate_on_closed || g_panel_open[sw] == 0) {
         if (g_cl_lock != 0) return false;
         for (uint32_t i = 0; (int32_t)i < (int32_t)g_panel_count; ++i) {
             if (g_panel_open[i] != 1) continue;
             switch (P32(g_panel_tbl[i] + modeoff)[0]) {
             case 0: break;
             case 1: e->sub_72790(i, 1, 0); break;
-            case 4: if (g_cl_flag9721 & 0xFF) e->sub_f7b20(); break;
+            case 4: if (g_cl_flag9721 & 0xFF) e->sub_f7b20(g_edi971d); break;
             default: return false;
             }
         }
@@ -80,23 +103,23 @@ static bool panel_core(const D2cClientEnv* e, uint32_t sw, uint32_t modeoff, boo
     if (g_focus == 0 || (P32(g_focus)[0] == 0 && e->sub_55440() == 0))
         g_panel_open[sw] = set_to_one ? 1 : (g_panel_open[sw] == 0);
     uint32_t nw = g_panel_open[sw];
-    if (old == 0) { if (nw != 0) e->sub_eccc0(e->ord10048(), notify); }
-    else if (nw == 0) { e->sub_ecc60(e->ord10048(), notify); if (close_extra) e->sub_3bbf0(); }
+    if (old == 0) { if (nw != 0) e->sub_eccc0(code, e->ord10048(notify)); }
+    else if (nw == 0) { e->sub_ecc60(code, e->ord10048(notify)); if (close_extra) e->sub_3bbf0(); }
     int32_t q = (int32_t)g_screen_w; q = (q + ((q >> 31) & 3)) >> 2;
     int32_t h = (int32_t)g_screen_h;  int32_t hq = (h + ((h >> 31) & 3)) >> 2;
     int32_t x, off;
     if (g_panel_open[1] == 0 && g_panel_open[4] == 0) {
-        if (nw == 0) { g_view_off = 0; g_view_mode = 0; e->ord10006(); off = 0; x = h; }
-        else { g_view_off = q; g_view_mode = 2; e->ord10006(); off = hq; x = h + hq; }
+        if (nw == 0) { g_view_off = 0; g_view_mode = 0; e->ord10006(0); off = 0; x = h; }
+        else { g_view_off = q; g_view_mode = 2; e->ord10006(q); off = hq; x = h + hq; }
     } else {
         if (nw != 0) {
-            g_view_off = 0; g_view_mode = 3; e->ord10006(); e->sub_3a4d0(h, 0, 0);
+            g_view_off = 0; g_view_mode = 3; e->ord10006(0); e->sub_3a4d0(g_ba9e18, h, 0, 0, g_cc3c4);
             g_clr_3dc = g_clr_3e0 = g_clr_3f8 = g_clr_3fc = 0;
             return true;
         }
-        g_view_off = -q; g_view_mode = 1; e->ord10006(); off = -hq; x = h - hq;
+        g_view_off = -q; g_view_mode = 1; e->ord10006((uint32_t)-q); off = -hq; x = h - hq;
     }
-    e->sub_3a4d0(x, 0, off);
+    e->sub_3a4d0(g_ba9e18, x, 0, off, g_cc3c4);
     return true;
 }
 
@@ -113,8 +136,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_97a70(uint32_t ecx, const uint16_
     g_str_bef4 = param3;
     if (e->ord10227() == 0 || g_cl_ready == 0) return;
     if (g_panel_count != 0x26) { fatal_exit(e, 0x139B); return; }
-    uint32_t st;
-    panel_core(e, 0x1D, 0x94, true, "809c0", false, &st);
+    panel_core(e, 0x1D, 0x94, true, 0x6FB809C0u, 2, false, false);
 }
 
 // 1.13c D2Client+0x97CD0: returns the unit at the focus id (hash 0x6fbba808) or 0 after toggling panel 0x1C
@@ -136,8 +158,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_97cd0(const D2cClientEnv* e) 
     }
     if (e->ord10227() == 0 || g_cl_ready == 0) return 0;
     if (g_panel_count != 0x26) { fatal_exit(e, 0x139B); return 0; }
-    uint32_t st;
-    panel_core(e, 0x1C, 0x90, false, "8099c", true, &st);
+    panel_core(e, 0x1C, 0x90, false, 0x6FB8099Cu, 3, true, true);
     return 0;
 }
 

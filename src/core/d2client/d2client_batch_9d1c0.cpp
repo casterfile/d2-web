@@ -42,35 +42,38 @@ uint32_t d2_client_9d280(uint32_t eax, Fatal fatal) {
     return eax + 0x66;
 }
 
-// 1.13c D2Client+0x9D440 (58 B): re-sort each node's [+4] chain of the 11CBC1C list (9D1C0, or 4D160 when
-// flags&2), then 4D040.
+// 1.13c D2Client+0x9D440 (58 B): re-sort each node's [+4] chain of the 11CBC1C list (9D1C0, or 9D160 with EAX =
+// the chain head when flags&2), then 9D040.
 extern "C" EMSCRIPTEN_KEEPALIVE
 void d2_client_9d440(uint32_t list_bc1c, uint32_t flags_9264c,
-                     uint32_t (*sub_4d160)(void), void (*sub_4d040)(void)) {
+                     uint32_t (*sub_4d160)(uint32_t eax_head), void (*sub_4d040)(void)) {
     for (uint32_t n = list_bc1c; n; n = rd32(n + 8))
-        wr32(n + 4, (flags_9264c & 2) ? sub_4d160() : d2_client_9d1c0(rd32(n + 4)));
+        wr32(n + 4, (flags_9264c & 2) ? sub_4d160(rd32(n + 4)) : d2_client_9d1c0(rd32(n + 4)));
     sub_4d040();
 }
 
 // 1.13c D2Client+0x9D500 (296 B): free both lists (heads 11CBC14 -> ids 0x14a, 11CBC18 -> 0x156): per node
 // free the +0x34 inner chain (0x3c each, 0x40 for the header) and the +0x38 chain (0x10d each), then the node.
-static void free_list(uint32_t* head, uint32_t node_id, void (*ord10043)(int, int)) {
+// ord10043 is the Fog free thunk (0xBF86) with retail's register image: ECX = the block, EDX = the RVA of the
+// source-file string the call site loads (0xD5FB4 for the 0x3c/0x40 blocks, 0xD4580 for the rest), then line, 0.
+typedef void (*Free10043)(uint32_t ecx, uint32_t edx_rva, int line, int zero);
+static void free_list(uint32_t* head, uint32_t node_id, Free10043 ord10043) {
     for (uint32_t n = *head; n;) {
         uint32_t next = rd32(n + 0x80), p = rd32(n + 0x34);
         if (p) {
-            for (uint32_t i = rd32(p); i; i = rd32(i + 8)) ord10043(0x3c, 0);
-            ord10043(0x40, 0);
+            for (uint32_t i = rd32(p); i;) { uint32_t nx = rd32(i + 8); ord10043(i, 0xD5FB4, 0x3c, 0); i = nx; }
+            ord10043(p, 0xD5FB4, 0x40, 0);
         }
         wr32(n + 0x34, 0);
-        for (uint32_t i = rd32(n + 0x38); i; i = rd32(i + 4)) ord10043(0x10d, 0);
+        for (uint32_t i = rd32(n + 0x38); i;) { uint32_t nx = rd32(i + 4); ord10043(i, 0xD4580, 0x10d, 0); i = nx; }
         wr32(n + 0x38, 0);
-        ord10043((int)node_id, 0);
+        ord10043(n, 0xD4580, (int)node_id, 0);
         n = next;
     }
     *head = 0;
 }
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_9d500(uint32_t* head_bc14, uint32_t* head_bc18, void (*ord10043)(int, int)) {
+void d2_client_9d500(uint32_t* head_bc14, uint32_t* head_bc18, Free10043 ord10043) {
     free_list(head_bc14, 0x14a, ord10043);
     free_list(head_bc18, 0x156, ord10043);
 }
@@ -85,14 +88,14 @@ uint32_t d2_client_9d670(uint32_t ecx, uint32_t id, uint32_t unit_bbfc, Find4D63
 }
 
 // 1.13c D2Client+0x9D850 (80 B): esi null -> fatal(0x5d1); [esi] != 0 -> fatal(0x5d2); rec = 9D630(ecx, esi[3]);
-// rec ? rec+0x66 : ord10920() (0 -> fatal(0x5db)).
+// rec ? rec+0x66 : ord10920(esi) (0 -> fatal(0x5db)).
 extern "C" EMSCRIPTEN_KEEPALIVE
-uint32_t d2_client_9d850(uint32_t ecx, uint32_t esi, Find4D630 sub_4d630, uint32_t (*ord10920)(void), Fatal fatal) {
+uint32_t d2_client_9d850(uint32_t ecx, uint32_t esi, Find4D630 sub_4d630, uint32_t (*ord10920)(uint32_t arg), Fatal fatal) {
     if (!esi) fatal(0x5d1);
     if (rd32(esi)) fatal(0x5d2);
     uint32_t rec = sub_4d630(ecx, rd32(esi + 0xc));
     if (rec) return rec + 0x66;
-    uint32_t r = ord10920();
+    uint32_t r = ord10920(esi);   // stdcall thunk 0xC7DE, one stack word: the record
     if (!r) fatal(0x5db);
     return r;
 }
@@ -100,19 +103,20 @@ uint32_t d2_client_9d850(uint32_t ecx, uint32_t esi, Find4D630 sub_4d630, uint32
 // 1.13c D2Client+0x9D910 (118 B): for each node of 11CBC14 (popped by 9D0A0), ensure a 12-byte entry with
 // that node's s16 [+0x22] exists in the 11CBC1C chain (next at +8); new ones are pushed on the front.
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_client_9d910(uint32_t* head_bc14, uint32_t* head_bc1c, uint32_t (*ord10042)(int, int), void (*sub_4d0a0)(void)) {
+void d2_client_9d910(uint32_t* head_bc14, uint32_t* head_bc1c,
+                     uint32_t (*ord10042)(uint32_t ecx_size, uint32_t edx_rva, int line, int zero), void (*sub_4d0a0)(uint32_t edi_group)) {
     while (*head_bc14) {
         int16_t id = rd16(*head_bc14 + 0x22);
         uint32_t e = *head_bc1c;
         while (e && rd16(e) != id) e = rd32(e + 8);
         if (!e) {
-            e = ord10042(0x1f9, 0);
+            e = ord10042(0xc, 0xD4580, 0x1f9, 0);   // Fog alloc thunk 0xBF7A: ECX = 12, EDX = source-file string RVA
             wr32(e, 0); wr32(e + 4, 0); wr32(e + 8, 0);
             *(int16_t*)(uintptr_t)e = id;
             wr32(e + 8, *head_bc1c);
             *head_bc1c = e;
         }
-        sub_4d0a0();
+        sub_4d0a0(e);   // EDI = the group (found or new)
     }
 }
 

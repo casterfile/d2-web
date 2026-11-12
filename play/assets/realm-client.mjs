@@ -1585,6 +1585,8 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
     d2gsClientMotionTick: () => call('d2_realm_client_motion_tick', 'number', [], []),
     // The own player's waiting action on a unit: the click, and the packets the engine's own steps want sent.
     d2gsClientLocalActOnUnit: Module._d2_realm_client_local_act_on_unit ? (kind, type, guid, run) => call('d2_realm_client_local_act_on_unit', 'number', ['number','number','number','number'], [kind, type, guid >>> 0, run ? 1 : 0]) : null,
+    // The own player's left click on a player unit (D2Client 0x1AB20): the use in reach, else the walk with the use waiting.
+    d2gsClientLocalClickPlayer: Module._d2_realm_client_local_click_player ? (guid, run) => call('d2_realm_client_local_click_player', 'number', ['number','number'], [guid >>> 0, run ? 1 : 0]) : null,
     d2gsClientLocalFire: Module._d2_realm_client_local_fire ? (kind, type, guid) => call('d2_realm_client_local_fire', 'number', ['number','number','number'], [kind, type, guid >>> 0]) : null,
     d2gsClientLocalSends: Module._d2_realm_client_local_sends ? () => {
       const n = call('d2_realm_client_local_sends', 'number', ['bigint'], [0n]), at = Number(call('d2_realm_client_local_send_view', 'bigint', [], [])) >>> 2;

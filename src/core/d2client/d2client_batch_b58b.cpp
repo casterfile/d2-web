@@ -16,17 +16,17 @@ struct D2cB58G { i32 *state /*B925F0*/, *mouseY /*1CB828*/, *mouseX /*1CB824*/, 
 extern "C" {
 // 1.13c D2Client+0x77DE0
 EMSCRIPTEN_KEEPALIVE void d2c_77de0(D2cHost h, D2cB58G* g) {
-    i32 base = *g->gW - *g->offX, lo, hi;
-    if (*g->state == 1) { lo = base - 0x95; hi = base - 0x73; }
-    else if (*g->state == 2) { lo = base - 0xdc; hi = base - 0xba; }
-    else if (*g->state == 3) { lo = base - 0x131; hi = base - 0x10f; }
+    i32 base = *g->gW - *g->offX, lo, hi, tab;
+    if (*g->state == 1) { lo = base - 0x95; hi = base - 0x73; tab = base - 0x86; }
+    else if (*g->state == 2) { lo = base - 0xdc; hi = base - 0xba; tab = base - 0xcd; }
+    else if (*g->state == 3) { lo = base - 0x131; hi = base - 0x10f; tab = base - 0x122; }
     else return;
     if (*g->mouseY < lo || *g->mouseY > hi) return;
     i32 y = *g->offY - 0x3f + *g->gH;
     if (y - 0x22 <= *g->mouseX && *g->mouseX <= y) {
         // retail: push 1; push 0; push (offY-0x62+gH); mov ecx,0x1030; call 0xD1EC; mov ecx,eax; mov edx,esi; call 0xD384
         u32 r = call(h, 0xD1EC, 0x1030, 0, (u32)(*g->offY - 0x62 + *g->gH), 0, 1);
-        call(h, 0xD384, r, (u32)(base - 0x122));
+        call(h, 0xD384, r, (u32)tab);  // retail esi differs per tab
     }
 }
 }

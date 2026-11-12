@@ -54,7 +54,7 @@ static inline uint32_t clientOf(E, uint32_t game) {
 // Stack merge of an item into an existing stack. param_2 = game/client, param_3 = source item;
 // reg: ESI = target stack, EDI = source quantity (stat 0x46 of param_3). Over max: clamp target and
 // send, remainder stays on the source; otherwise absorb and finish.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d36d0(uint32_t p1, uint32_t game, uint32_t item, uint32_t esiTarget, uint32_t ediQty, E)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D36D0(uint32_t p1, uint32_t game, uint32_t item, uint32_t esiTarget, uint32_t ediQty, E)
 {
     (void)p1;
     if (call(env->o11102, item) == 0) return;
@@ -109,7 +109,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d3950_old(uint32_t ediPlayer, 
 
 // 1.13c D2Game+0xD39B0
 // param_1 = player/client record; reg: EBX forwarded to 0xD2D90. Same shape as 0xD3950 with 0x8C810.
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d39b0(uint32_t param1, uint32_t ebx, E)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D39B0(uint32_t param1, uint32_t ebx, E)
 {
     if (param1 != 0 && rd32(H(param1), 0) == 0) call(env->o10920, param1);
     uint32_t zero = 0;
@@ -121,7 +121,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d39b0(uint32_t param1, uint32_
 // 1.13c D2Game+0xD3A10
 // Stack merge of the carried item into the stack found by Ordinal_10964(player+0x60). param_1 =
 // game (non-null), param_2 = player, param_3 = item. Returns 1 when merged, 0 when no target stack.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d3a10(uint32_t game, uint32_t player, uint32_t item, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D3A10(uint32_t game, uint32_t player, uint32_t item, E)
 {
     if (game == 0) FATAL(0x623);
     uint32_t tgt = call(env->o10964, rd32(H(player), 0x60), item, 0);
@@ -163,7 +163,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d3a10(uint32_t game, uint3
 // 1.13c D2Game+0xD3C40
 // reg: EAX = flag (both branches identical), EBX = item (non-null), EDI = player. Looks up the
 // stack target with Ordinal_10964(player+0x60) and hands it to 0xD34B0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d3c40(uint32_t eax, uint32_t ebxItem, uint32_t ediPlayer, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D3C40(uint32_t eax, uint32_t ebxItem, uint32_t ediPlayer, E)
 {
     (void)eax;
     if (ebxItem == 0) FATAL(0);
@@ -180,7 +180,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d3c40(uint32_t eax, uint32
 // quantity width 8/16/32; opcode 0x3E, length byte = bits+2, 0x22-byte send), or absorbs the rest
 // and finishes (D31D0, E20A0-class cleanup via 0xDFC10 / 0xD20A0). reg: EBX = remaining capacity.
 // Bit-field widths follow the spilled-argument layout of the decompile.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d3cb0(uint32_t p1, uint32_t p2, uint32_t param3, int32_t ebx, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D3CB0(uint32_t p1, uint32_t p2, uint32_t param3, int32_t ebx, E)
 {
     (void)p1; (void)p2;
     uint32_t cur = 0; uint32_t visits = 0;
@@ -264,12 +264,12 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d3cb0(uint32_t p1, uint32_
 // Dispatch on the item kind: param_1 = item (non-null, else fatal 0x660); reg: EAX = game,
 // ESI = player. Ordinal_10744 true -> 0xD3C40, second 10744 true -> 0xD3A10, else a stackable
 // (10048 -> here o10955 pair) goes to 0xD3CB0.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d4360(uint32_t item, uint32_t eaxGame, uint32_t esiPlayer, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D4360(uint32_t item, uint32_t eaxGame, uint32_t esiPlayer, E)
 {
     if (item == 0) FATAL(0x660);
-    if (call(env->o10744)) return d2_fn_d2game_d3c40(0, item, esiPlayer, env);
-    if (call(env->o10744)) return d2_fn_d2game_d3a10(item, eaxGame, esiPlayer, env);
-    if (call(env->o10955) /* 10048/10955 pair */ ) return d2_fn_d2game_d3cb0(item, eaxGame, esiPlayer, 0, env);
+    if (call(env->o10744)) return d2_fn_d2game_D3C40(0, item, esiPlayer, env);
+    if (call(env->o10744)) return d2_fn_d2game_D3A10(item, eaxGame, esiPlayer, env);
+    if (call(env->o10955) /* 10048/10955 pair */ ) return d2_fn_d2game_D3CB0(item, eaxGame, esiPlayer, 0, env);
     return 0;
 }
 
@@ -278,7 +278,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d4360(uint32_t item, uint3
 // (game+0x1720 + (id&0x7f)*4, chain link +0xE4, id at +0x0C, type +0 == 4, mode +0x10 == 4).
 // param_1 = game, param_2 = player, param_3 = body location, param_4 = out error flag.
 // Returns 1 on success; the unit is moved to the cursor and the previous occupant (o11139) swapped.
-extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_d5c30(uint32_t eaxId, uint32_t game, uint32_t player, uint8_t bodyLoc, uint32_t* outErr, E)
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_fn_d2game_D5C30(uint32_t eaxId, uint32_t game, uint32_t player, uint8_t bodyLoc, uint32_t* outErr, E)
 {
     if (game == 0) FATAL(0xd39);
     if (player == 0) FATAL(0xd3a);
@@ -378,7 +378,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6710_old(uint32_t param1, uin
 // reg: EAX = unit, EDI = arg for 0xD6710. h = unit+0x60; when Ordinal_10202() is 0 and h != 0:
 // fatal 0x1384 if Ordinal_11051 holds, else 0xD6710, 10977, optional second 10977, 10050(h), 10201,
 // then 0xDFFD0(6, unit).
-extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_d6bc0(uint32_t eaxUnit, uint32_t ediArg, E)
+extern "C" EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_D6BC0(uint32_t eaxUnit, uint32_t ediArg, E)
 {
     uint32_t h = rd32(H(eaxUnit), 0x60);
     if (call(env->o10202) != 0 || h == 0) return;

@@ -219,7 +219,7 @@ EMSCRIPTEN_KEEPALIVE void* d2_fn_d2game_4eea(const D2GameCrtStreamEnv* env) {
 // Every zero-byte item write decrements the count while it is nonzero; the adjusted count is written
 // back into the +2 slot and the byte length is the result.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_537d0(uint8_t* dest, void* pInventory, void* game, void* unit,
+EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2game_537D0(uint8_t* dest, void* pInventory, void* game, void* unit,
                                                 int32_t nSize, const D2GameBatch537d0Env* env) {
     (void)game;
     (void)unit;

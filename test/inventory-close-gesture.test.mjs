@@ -5,6 +5,7 @@ import {
   inventoryCloseAt, inventoryCloseFrame,
 } from '../play/assets/inventory-close-gesture.mjs';
 import { TRADEBTN_CLOSESTASH, closeStashFromInventory } from '../play/assets/stash-close.mjs';
+import { haveEngine, loadEngine } from './helpers/node-engine.mjs';
 
 test('inventory close uses the native inclusive hit rectangle, separate from its cel', () => {
   assert.equal(inventoryCloseAt(418, 444, 800, 600, true), true);
@@ -64,13 +65,38 @@ test('accepted stash close still sends button 18 and refusal leaves paired panel
 
 test('stash close: hit on the cel, press draws buysellbtn frame 11, release inside closes via button 18', async () => {
   const { stashCloseAt } = await import('../play/assets/stash-close.mjs');
-  assert.equal(stashCloseAt(352, 445, 800, 600, true), true);
-  assert.equal(stashCloseAt(383, 476, 800, 600, true), true);
-  assert.equal(stashCloseAt(384, 460, 800, 600, true), false);
-  assert.equal(stashCloseAt(360, 460, 800, 600, false), false);
+  const calls = [];
+  const hit = (...a) => { calls.push(a); return 1; };
+  assert.equal(stashCloseAt(372.6, 461.2, 800, 600, true, hit), true);
+  assert.deepEqual(calls[0], [372, 461, 80, -60, 600, 1]);
+  assert.equal(stashCloseAt(372 + 500, 461 + 300, 1800, 1200, true, hit, false), true);
+  assert.deepEqual(calls[1], [372, 461, 80, -60, 600, 0]);
+  assert.equal(stashCloseAt(360, 460, 800, 600, false, hit), false);
+  assert.equal(stashCloseAt(360, 460, 800, 600, true, null), false);
+  assert.equal(stashCloseAt(360, 460, 800, 600, true, () => 0), false);
+  assert.equal(calls.length, 2);
   const press = beginInventoryClosePress(7, true, true);
   assert.equal(inventoryCloseFrame(Boolean(press)), 11);
   assert.equal(inventoryCloseFrame(Boolean(null)), 10);
   assert.equal(finishInventoryClosePress(press, 7, true, true, true).activate, true);
   assert.equal(finishInventoryClosePress(press, 7, true, true, false).activate, false);
+});
+
+// Each edge of the stash close button and one pixel past it, in 800x600 game px, for an expansion and a
+// classic game: the bounds the original client accepts when the button is clicked headlessly.
+test('stash close: engine hit test, every edge and one pixel past', { skip: !haveEngine() && 'needs engine' }, async () => {
+  const { stashCloseAt } = await import('../play/assets/stash-close.mjs');
+  const Module = await loadEngine({});
+  const hit = (...a) => Module.ccall('d2_client_stash_close_hit', 'number', ['number', 'number', 'number', 'number', 'number', 'number'], a);
+  for (const [expansion, x0, x1, y0, y1] of [[true, 353, 391, 442, 480], [false, 356, 394, 441, 479]]) {
+    const at = (x, y) => stashCloseAt(x, y, 800, 600, true, hit, expansion);
+    const mx = (x0 + x1) >> 1, my = (y0 + y1) >> 1;
+    assert.equal(at(mx, my), true);
+    assert.equal(at(x0, my), true); assert.equal(at(x0 - 1, my), false);
+    assert.equal(at(x1, my), true); assert.equal(at(x1 + 1, my), false);
+    assert.equal(at(mx, y0), true); assert.equal(at(mx, y0 - 1), false);
+    assert.equal(at(mx, y1), true); assert.equal(at(mx, y1 + 1), false);
+    assert.equal(at(x0, y0), true); assert.equal(at(x1, y1), true);
+    assert.equal(at(x0 - 1, y0 - 1), false); assert.equal(at(x1 + 1, y1 + 1), false);
+  }
 });

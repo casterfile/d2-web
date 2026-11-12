@@ -43,16 +43,16 @@ uint32_t d2_client_88440(int32_t idx, uint32_t tab_24c, int32_t cnt_250, uint32_
         row = (uint32_t)idx * 0x8E + tab_24c;
     bool use568;
     if (row == 0) {
-        use568 = ord10839(local_bbfc, param_1, 2) == 0;
+        use568 = ord10839(local_bbfc, param_1, 2) != 0;
     } else {
         if (rd(row + 0x47, 4) == 4) return 0;
         if (rd(row + 0x60, 4) != 0xCA) {
-            use568 = ord10839(local_bbfc, param_1, 2) == 0;
+            use568 = ord10839(local_bbfc, param_1, 2) != 0;
         } else {
-            uint32_t i = sub_5EB90() & 0xFF;
-            uint32_t r2 = (tab_254 && i < (uint32_t)cnt_258) ? i * 0x58 + tab_254 : 0;
+            int32_t i = (int32_t)sub_5EB90();   // the full EAX of 0x5EB90 (signed compare, as the decompile)
+            uint32_t r2 = (tab_254 && i >= 0 && i < cnt_258) ? (uint32_t)i * 0x58 + tab_254 : 0;
             if (r2 == 0) return 0;
-            use568 = (rd(r2 + 0x18, 1) & 0xFF) == 0;
+            use568 = (rd(r2 + 0x18, 1) & 0xFF) != 0;
         }
     }
     return use568 ? 1u : 0u;

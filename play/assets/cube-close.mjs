@@ -3,7 +3,8 @@
 // client never closes a panel on a pointer hit alone, the same rule stash-close.mjs keeps for the stash.
 export const TRADEBTN_CLOSECUBE = 23;
 
-// The cube's close cel: 32x32 at game px (352, 445), the same cel and hit rect as the stash's close (stash-close.mjs).
+// The cube's close cel: 32x32 at game px (352, 445), the cel the stash's close draws. The cube's own hit bounds are
+// not recovered; the stash's are the engine's hit test (stash-close.mjs), which covers x 353..391, y 442..480 there.
 export const CUBE_CLOSE = { x: 352, y: 445, w: 32, h: 32 };
 
 // True when a canvas point is on the cube's close cel. `visible` is the cube's own flag (open and its inventory up).

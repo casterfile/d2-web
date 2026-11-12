@@ -35,4 +35,5 @@ struct D2GameBatchC7130Env {
     const uint8_t* dataTables;                         // sgptDataTables block
     uint32_t (*sub21100)(void* u); uint32_t (*sub21130)(void* u); uint32_t (*sub21280)();
     void     (*ord10346)(uint32_t v, uint32_t w);
+    uint32_t modBase;                                  // retail module base the stored callback addresses are relative to (probes: 0xB2000000)
 };

@@ -320,23 +320,27 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C8990(uint8_t* game, uint8_t* unit, uint3
 }
 
 // 1.13c D2Game+0xC9CB0
-// Town-entry setup for a player. The decompile drops the unit register (EAX = unit) at the 10920,
-// 565E0, 11090, 10331 and type-word sites; EAX is modelled there. A missing type-0xD node is a null
-// dereference in retail and returns here.
+// Town-entry setup for a player. Retail: EAX = the player unit, stack = (game, item) with ret 8; `item` is the second stack word (the unit
+// whose position and AllocUnit handle the tail uses). Seam argument layout (registers in the comments):
+//   o10920 (0xA4C0) 1 stack word; o10003 (0xA57A) 3 words; fE660 (0xE660) EAX = unit, EBX = game, word = tag; f365E0 (0x365E0) ECX = unit,
+//   words (game, unit+0x60); f9BEB0 (0x9BEB0) EAX = unit; f9C160 (0x9C160) EBX = 0, ESI = game, EDI = unit+0x80, word = callback RVA;
+//   fDFCC0 (0xDFCC0) a = callback RVA (EBX), b = EDI (game); f33AF0 (0x33AF0) words (node, callback RVA); o11090 (0xA4A2) (item, 1);
+//   o10331 (0xA478) (item); o10750 (0xA3B8) and o10867 (0xA454) 1 word; f1280 (0x1280) a = EAX (item handle), b = EBX (x), c = EDI (y);
+//   o10346 (0xA51A) (v, 0). A missing type-0xD node, a null list and a null +0x2C are null dereferences in retail and return here.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C9CB0(uint8_t* unit, uint8_t* game, const D2GameBbf30cEnv* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C9CB0(uint8_t* unit, uint8_t* game, uint8_t* item, const D2GameBbf30cEnv* env)
 {
     uint8_t* pd = PN(Q(o10920, unit));
-    Q(o10003, rd32(pd, 0x10 + rd8(game, 0x6D) * 4), 10);
+    Q(o10003, rd32(pd, 0x10 + rd8(game, 0x6D) * 4), 10, 0);
     pd = PN(Q(o10920, unit));
     Q(o10003, rd32(pd, 0x10 + rd8(game, 0x6D) * 4), 10, 0xD);
-    if (Q(fE660, 0x20747368) != 0) Q(f365E0, unit, game);   // "hst "
-    if (Q(fE660, 0x20706976) != 0) Q(f365E0, unit, game);   // "viv "
-    if (Q(fE660, 0x2066736D) != 0) Q(f365E0, unit, game);   // "msf "
-    if (unit != nullptr && rd32(unit, 0x80) != 0 && rd32(unit, 0) == 0 && (int16_t)Q(f9BEB0) != -1)
-        Q(f9C160, 0xE7D00);                                    // callback 0x6FCE7D00
+    if (Q(fE660, unit, game, 0x20747368) != 0) Q(f365E0, unit, game, rd32(unit, 0x60));   // "hst "
+    if (Q(fE660, unit, game, 0x20706976) != 0) Q(f365E0, unit, game, rd32(unit, 0x60));   // "viv "
+    if (Q(fE660, unit, game, 0x2066736D) != 0) Q(f365E0, unit, game, rd32(unit, 0x60));   // "msf "
+    if (unit != nullptr && rd32(unit, 0x80) != 0 && rd32(unit, 0) == 0 && (uint16_t)Q(f9BEB0, unit) != 0xFFFF)
+        Q(f9C160, 0xC7D00, game, rd32(unit, 0x80));
     wr8(P(game, 0x10F4), 0x20, 3);
-    Q(fDFCC0, 0, 0);
+    Q(fDFCC0, 0x359C0, (uintptr_t)game);
 
     uint8_t* node = nullptr;
     uint8_t* list = P(game, 0x10F4);
@@ -347,51 +351,60 @@ EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_C9CB0(uint8_t* unit, uint8_t* game, const
     uint8_t* rec = P(node, 0x18);
     wr8(rec, 0xD, 1);
     wr8(rec, 0xE, 1);
-    if (rd8(rec, 3) == 0) { Q(f33AF0, node); wr8(rec, 3, 1); }
-    Q(o11090, unit, 1);
-    uintptr_t h = Q(o10331, unit);
+    if (rd8(rec, 3) == 0) { Q(f33AF0, node, 0xC94E0); wr8(rec, 3, 1); }
+    Q(o11090, item, 1);
+    uintptr_t h = Q(o10331, item);
     if (h == 0) die(env, 0x686);
-    if (rd32(unit, 0) != 2 && (rd32(unit, 0) < 4 || rd32(unit, 0) > 5) && rd32(unit, 0x2C) != 0) Q(o10750, rd32(unit, 0x2C));
-    if (rd32(unit, 0) != 2 && (rd32(unit, 0) < 4 || rd32(unit, 0) > 5) && rd32(unit, 0x2C) != 0) Q(o10867, rd32(unit, 0x2C));
-    uintptr_t other = Q(f1280);
+    const int32_t t = (int32_t)rd32(item, 0);
+    const bool direct = t == 2 || (t > 3 && t <= 5);
+    uint32_t y = 0, x = 0;
+    if (direct) y = rd32(P(item, 0x2C), 0x10);
+    else if (rd32(item, 0x2C) != 0) y = (uint32_t)Q(o10750, rd32(item, 0x2C));
+    if (direct) x = rd32(P(item, 0x2C), 0xC);
+    else if (rd32(item, 0x2C) != 0) x = (uint32_t)Q(o10867, rd32(item, 0x2C));
+    uintptr_t other = Q(f1280, h, x - 0xD, y + 3);
     Q(o10346, h, 0);
     if (other != 0) Q(o10346, other, 0);
 }
 
 // 1.13c D2Game+0xCAB30
-// Builds the per-region monster-type records MonsterRegion.cpp:0x87 for ids 1..count-1 of table
-// +0xC5C, one 0x2E4-byte record each, appends their 0x34-byte spawn entries (count at record+0x10) to
-// region+4 through 0xFF1A0(…,3), and stores the 32-bit record pointers to out[]. param_4 is the
-// difficulty.
+// Builds the per-region monster-type records MonsterRegion.cpp:0x87 for ids 1..count-1 of table +0xC5C, one 0x2E4-byte record each, and stores
+// the 32-bit record pointers to out[1..]. Retail: EDX = seed, stack = (pool, out, seedp, diff, flag), ret 0x14. pool is the allocator context
+// (ECX of 0xA2E6, [game+0x1C]), seedp the seed block (0xA628 ECX), diff the difficulty byte (checked by 0xA7BA, the fatal 0x83 path), flag the
+// 16-bit-field selector (the caller's [game+0x70]). 0xCA760 takes EAX = (diff > 0), EBX = seedp; the spawn entries it writes at record+0x14
+// (count byte at record+0x10, 0x34 bytes each) are rolled through 0xDF1A0(seedp, entry, 3).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CAB30(uint32_t* out, uint8_t* region, uint32_t unused, uint32_t diff, const D2GameBbf30cEnv* env)
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_CAB30(uint32_t seed, uint8_t* pool, uint32_t* out, uint8_t* seedp, uint32_t diff, uint32_t flag, const D2GameBbf30cEnv* env)
 {
-    (void)unused;
-    Q(o10614);
-    uint32_t u = diff & 0xFF;
+    Q(o10614, seedp, seed);
+    const uint32_t u = diff & 0xFF;
     if (Q(o10237, u) == 0) die(env, 0x83);
-    const int32_t count = (int32_t)rd32(env->dataTables, 0xC5C);
-    for (int32_t id = 1; id < count; ++id) {
-        uint8_t* rec = PN(Q(o10045, kMonReg, 0x87, 0));
+    int32_t count = (int32_t)rd32(env->dataTables, 0xC5C);
+    if (count <= 1) return;
+    const uint32_t big = u != 0 ? 1u : 0u;
+    uint32_t* cur = out + 1;
+    for (int32_t id = 1; id < count; ) {
+        uint8_t* rec = PN(Q(o10045, kMonReg, 0x87, 0, pool));
         std::memset(rec, 0, 0xB9 * 4);
         uint8_t* r = PN(Q(o10014, id));
         wr8(rec, 0, rd8(r, 3));
-        wr32(rec, 0xB0 * 4, id);
+        wr32(rec, 0xB0 * 4, (uint32_t)id);
         wr32(rec, 0xAE * 4, rd32(r, 0x1C + u * 4));
-        wr8(rec, 0xAF * 4, rd8(r, 0x28 + u));
+        wr8(rec, 0x2BC, rd8(r, 0x28 + u));
         wr8(rec, 0x2BD, rd8(r, 0x2B + u));
         wr8(rec, 0x2BE, rd8(r, 0x2E));
         wr32(rec, 0xB5 * 4, 0xFFFFFFFFu);
         wr32(rec, 3 * 4, 0xFFFFFFFFu);
-        wr8(rec, 0xB6 * 4, rd8(r, 0x30));
-        int16_t s = (diff == 0) ? rds16(r, 0x10) : rds16(r, 0x16 + u * 2);
+        wr8(rec, 0x2D8, rd8(r, 0x30));
+        const int16_t s = flag != 0 ? rds16(r, 0x16 + u * 2) : rds16(r, 0x10 + u * 2);
         wr32(rec, 0xB7 * 4, (uint32_t)(int32_t)s);
         wr32(rec, 0xB8 * 4, (uint32_t)(int32_t)s);
-        Q(fCA760, r, rec);
-        uint8_t* e = rec + 5 * 4;
-        for (uint32_t i = 0; i < rd8(rec, 4 * 4); ++i, e += 0xD * 4) Q(fDF1A0, region + 4, e, 3);
-        wr32(out, 0, (uint32_t)(uintptr_t)rec);
-        out++;
+        Q(fCA760, r, rec, big, seedp);
+        uint8_t* e = rec + 0x14;
+        for (int32_t k = 0; k < (int32_t)rd8(rec, 0x10); ++k, e += 0x34) Q(fDF1A0, seedp, e, 3);
+        *cur++ = (uint32_t)(uintptr_t)rec;
+        ++id;
+        count = (int32_t)rd32(env->dataTables, 0xC5C);
     }
 }
 

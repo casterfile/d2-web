@@ -91,7 +91,7 @@ EMSCRIPTEN_KEEPALIVE int32_t UNITS_GetTotalMaxStamina_39050(D2UnitStrc* pUnit)
 // ItemStatCost row nStatId through the 0x38B00 getter. Guards: null unit, nStatId out of range,
 // null row, null stat list.
 extern "C"
-EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_38c20(D2UnitStrc* pUnit, int32_t nStatId,
+EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_38c20(D2UnitStrc* pUnit, int32_t nStatId,
                                                   int32_t nLayer)
 {
 	if (!pUnit)

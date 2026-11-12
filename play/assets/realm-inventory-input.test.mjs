@@ -102,6 +102,20 @@ test('the join stream fills the panel: carried, worn and belt items, gold, and t
   assert.deepEqual(g.layout.slots, { 4: { left: 420, right: 476, top: 110, bottom: 220 }, 1: { left: 530, right: 588, top: 60, bottom: 118 }, 5: { left: 650, right: 706, top: 110, bottom: 220 } });
 });
 
+test('the identify cursor: S2C 0x3F arms it, the next press on an item is 0x27 [clicked][armed], 0x3F 0xFF/0xFFFF disarms (D2Client 0x86A40, 0x95FE0)', () => {
+  const g = joined(); g.feed(...joinStream);
+  const last = () => g.sent[g.sent.length - 1];
+  g.feed(Uint8Array.from([0x3f, 1, 0x0b, 0, 0, 0, 0xff, 0xff]));
+  assert.deepEqual(g.world.useItem, { id: 11, kind: 1 });
+  assert.equal(g.click(...g.cell(2, 1), 0, { armed: 11 }), true);
+  assert.equal(last(), '27' + '0a000000' + '0b000000');
+  const before = g.sent.length;
+  assert.equal(g.click(...g.cell(0, 0), 0, { armed: 11 }), true);          // an empty cell: nothing goes out
+  assert.equal(g.sent.length, before);
+  g.feed(Uint8Array.from([0x3f, 0xff, 0x0b, 0, 0, 0, 0xff, 0xff]));
+  assert.equal(g.world.useItem, null);
+});
+
 test('each panel click sends the client packet and the panel changes on the server\'s answer', () => {
   const g = joined(); g.feed(...joinStream);
   const last = () => g.sent[g.sent.length - 1];
@@ -173,4 +187,13 @@ test('a game joined from the title screen builds the inventory, stash and cube p
   assert.match(realmChrome, /buildStoragePanels\(\)/);
   const click = shell.slice(shell.indexOf('function realmInventoryClick('), shell.indexOf('function realmStorageClickAt('));
   assert.match(click, /realmInventoryPanelClick\(\{[^}]*renderer: inventoryPanelRenderer/s, 'the shell routes the click through the panel it draws');
+});
+
+test('the pointer press has one input path: no engine item, object, warp, NPC or corpse branch beside the packets', () => {
+  const shell = readFileSync(new URL('../gameplay-shell.mjs', import.meta.url), 'utf8');
+  const press = shell.slice(shell.indexOf("canvas.addEventListener('pointerdown'"), shell.indexOf("globalThis.addEventListener('pointerup'"));
+  for (const gone of ['session.objectClick', 'd2_session_command_recover_corpse', 'd2_session_command_warp_interact', "itemCommand('lift'", "itemCommand('drop'", 'talkToNpc(npcHit'])
+    assert.equal(press.includes(gone), false, `${gone} is not in the press handler`);
+  assert.match(press, /clientView\(\)\.commands\.panelClick\(x, y, e\)/);
+  assert.match(shell, /canvas\.addEventListener\('contextmenu', \(e\) => \{ e\.preventDefault\(\); \}\)/);
 });

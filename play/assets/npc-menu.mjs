@@ -59,6 +59,9 @@ export const menuReturnsAfterSpeech = (pending, npcId, alive = true) => !!pendin
 /** The menu that returns after speech `spoken`: a quest topic just heard is gone from the engine's list (0x31 consumed it), so its row is not offered again. */
 export const entriesAfterSpeech = (entries, spoken) => entries.filter((e) => !(e.action === 'topic' && e.stringId === spoken));
 
+/** The client's speech-end rule: the first message of the list other than the one just spoken, else null (then the Talk box reopens). */
+export const nextSpeechAfterTopic = (messages, spoken) => { const m = messages.find((x) => x.stringId !== spoken); return m ? m.stringId : null; };
+
 /** The retail entries for an NPC class (first matching record, as D2Client walks the table), or null. */
 // P7b: the Talk box (kashya-talk-r14: talk / introduction / gossip / Den of Evil / cancel). Introduction and Gossip are always there;
 // then one topic per menu-2 message of the engine's 0x27 list (D2Text nMenu 2), labelled with its quest's own name (npc-topics.mjs).

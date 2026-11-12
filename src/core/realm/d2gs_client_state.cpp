@@ -824,6 +824,9 @@ static bool ensure_player_unit(D2RealmClientPlayerEntry& player) {
     if (!player.motionUnit) return false;
     player.motionUnit->dwClassId = static_cast<int32_t>(view.classId);
     player.motionUnit->dwUnitId = view.guid;
+    // The client's new player unit is targetable, attackable and a valid target (flags 2, 4 and 8; bit 0x20
+    // cleared): the arrival gate +0x2AFB0 reads flag 2.
+    player.motionUnit->dwFlags = (player.motionUnit->dwFlags & ~0x20u) | 0xeu;
     if (!d2_realm_client_unit_resources_init(player.motionUnit)) {
         d2_realm_client_unit_resources_destroy(player.motionUnit);
         UNITS_FreeUnit(player.motionUnit);
@@ -3056,10 +3059,10 @@ static int local_fire(D2UnitStrc* unit, uint32_t kind, uint32_t type, uint32_t g
 // waits again (+0x2AA40); in reach the action starts (+0x2A7C0).
 //  - an object must be targetable;
 //  - a dying or dead monster is a target only for a hand skill that takes corpses.
-// GUESS (targetable): the targetable flag of a live monster or player is not kept by this client
-// and is taken as set. Settled by the unit flags of the assign packets.
-// GUESS (player corpse): a dead player is taken as usable; whether it may be looted is the page's
-// test (+0x2AFB0 is not ported).
+//  - a player target goes through the arrival gate +0x2AFB0 (local_player_arrival below).
+// GUESS (targetable): the targetable flag of a live monster is not kept by this client and is
+// taken as set. Settled by the unit flags of the assign packets.
+static void local_player_arrival(D2UnitStrc* unit, D2UnitStrc* target, uint32_t kind, uint32_t guid, bool run);
 static void local_queue_step(D2UnitStrc* unit, bool run) {
     if (!g_localQueued.fire) return;
     const LocalQueuedAction q = g_localQueued;
@@ -3068,6 +3071,7 @@ static void local_queue_step(D2UnitStrc* unit, bool run) {
     if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return;
     D2UnitStrc* target = find_realm_client_unit(static_cast<uint8_t>(q.type), q.guid);
     if (!target || !UNITS_GetRoom(target)) return;
+    if (q.type == UNIT_PLAYER) { local_player_arrival(unit, target, q.kind, q.guid, run); return; }
     if (q.type == UNIT_OBJECT) {
         if (!(target->dwFlags & UNITFLAG_TARGETABLE)) return;
     } else if (q.type == UNIT_MONSTER && (target->dwAnimMode == MONMODE_DEATH || target->dwAnimMode == MONMODE_DEAD)) {
@@ -3773,6 +3777,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_realm_client_pet_stat(uint32_t guid, int32_t sta
 // A body returns the number of records it applied, or a negative code that rejects the stream.
 extern "C++" {
 #include "../d2client/cl_env.h"
+#include "../d2client/d2client_1ab20.h"
 #include "../d2client/server_packet_table.h"
 }
 extern "C" void d2c_ace20(const cl::Env& e, uint32_t base, uint32_t buf, int32_t len);
@@ -4243,6 +4248,96 @@ static uint32_t relation_flags(uint32_t from, uint32_t to) {
     if (from == to) return 0;
     for (const auto& r : g_relations) if (r.from == from && r.to == to) return r.flags;
     return 0;
+}
+
+// ---- The own player's click on a player unit (1.13c D2Client+0x1AB20, unit type 0) and the arrival gate of
+// the action it leaves waiting (+0x2AFB0, called by the queue worker +0x2B090). Both run as ported; their unit
+// reads go to 32-bit records in retail's layout (+0 type, +4 class, +0xC id, +0x10 mode, +0x14 player data,
+// +0xC4 flags) built from the client units, and their callees go to this client's own steps.
+extern "C" uint32_t d2c_2afb0(uint32_t rec, uint32_t id, uint32_t a1, uint32_t a2, uint32_t a3, const cl::Env& e);
+extern "C++" {   // C++ linkage: this file's extern "C" block would make these names one entity with line5a's
+namespace unitclick {
+struct Rec { uint32_t w[0xc8 / 4]; };
+Rec g_hero, g_target;
+uint32_t g_latch[2];                    // DWORD 0x11C2F4 (pending target) and 0x11C2F8 (busy latch)
+uint8_t g_rosterRec[0x20];
+D2UnitStrc *g_heroUnit, *g_targetUnit;
+uint32_t g_type, g_guid, g_kind;
+bool g_run;
+int g_started;
+inline uint32_t p32(const void* p) { return static_cast<uint32_t>(reinterpret_cast<uintptr_t>(p)); }
+void fill(Rec& r, const D2UnitStrc* u) {
+    std::memset(&r, 0, sizeof r);
+    r.w[0] = u->dwUnitType; r.w[1] = static_cast<uint32_t>(u->dwClassId); r.w[3] = u->dwUnitId;
+    r.w[4] = u->dwAnimMode; r.w[0xc4 / 4] = u->dwFlags;
+}
+D2UnitStrc* unit_of(const void* p) { return p == &g_hero ? g_heroUnit : p == &g_target ? g_targetUnit : nullptr; }
+uint32_t rd(void*, uint32_t a) { uint32_t v; std::memcpy(&v, reinterpret_cast<const void*>(static_cast<uintptr_t>(a)), 4); return v; }
+void wr(void*, uint32_t a, uint32_t v) { std::memcpy(reinterpret_cast<void*>(static_cast<uintptr_t>(a)), &v, 4); }
+// The callees of +0x2AFB0 by their retail addresses and the registers the port passes.
+uint32_t call(void*, uint32_t rva, uint32_t eax, uint32_t ecx, uint32_t edx, uint32_t ebx, uint32_t esi,
+              uint32_t s0, uint32_t, uint32_t, uint32_t, uint32_t) {
+    switch (rva) {
+    case 0x9d630: {                     // the roster record of a player, or of a corpse's owner: its id at +0x10
+        const uint32_t owner = roster_find(edx) ? edx : g_corpses.ownerOf(edx);
+        if (!owner) return 0;
+        std::memset(g_rosterRec, 0, sizeof g_rosterRec);
+        std::memcpy(g_rosterRec + 0x10, &owner, 4);
+        return p32(g_rosterRec);
+    }
+    case 0x4fd90: return relation_flags(edx, esi) & s0;   // the flags the owner holds toward the hero
+    case 0x2a7c0: g_started = local_fire(g_heroUnit, s0, g_type, g_guid); return 0;   // EAX = hero, stack the action
+    case 0x29e80: return local_must_walk(g_heroUnit, g_targetUnit) ? 1 : 0;           // EAX = action, ECX = hero
+    case 0x2aa40: g_started = local_walk_first(g_heroUnit, s0, g_type, g_guid, g_run); return 0;
+    default: (void)eax; (void)ecx; (void)ebx; return 0;
+    }
+}
+// The callees of +0x1AB20 its player branch reaches.
+int32_t distance(void* tgt, void* pl) { return D2Common_10399(unit_of(tgt), unit_of(pl)); }                 // #10407
+int32_t collide(void* pl, void* tgt, int32_t m) { return UNITS_TestCollisionBetweenInteractingUnits(unit_of(pl), unit_of(tgt), m); }   // #10324
+int32_t gate() { return local_action_gate(g_heroUnit) ? 1 : 0; }                                            // 0x29F30
+void use(void*, const uint32_t*, uint32_t) { g_started = local_fire(g_heroUnit, 0x13, g_type, g_guid); }   // 0x2A750: action 2, the use
+void walk(void*, uint32_t action, uint32_t) { g_started = local_fire(g_heroUnit, action, g_type, g_guid); } // 0x2A7C0
+void arm(void*, uint32_t action, uint32_t type, uint32_t guid) { g_localQueued = { 1, action, type, guid }; }  // 0x2D50
+}  // namespace unitclick
+}  // extern "C++"
+
+// +0x2B090 kind 0: the waiting action on a player unit is gated by +0x2AFB0. A dying or lying player, or one
+// flagged dead, is used at once when it is the hero's own or its owner lets the hero (relation bit 1); a live
+// one only while it is targetable (flag 2), walking again when out of reach; anything else is dropped.
+static void local_player_arrival(D2UnitStrc* unit, D2UnitStrc* target, uint32_t kind, uint32_t guid, bool run) {
+    using namespace unitclick;
+    g_heroUnit = unit; g_targetUnit = target; g_type = UNIT_PLAYER; g_guid = guid; g_run = run; g_started = 0;
+    fill(g_hero, unit); fill(g_target, target);
+    cl::Env env{};
+    env.ctx = nullptr; env.h = call; env.rd = rd; env.wr = wr; env.gl = p32(g_latch);
+    if (d2c_2afb0(p32(&g_target), guid, p32(&g_hero), kind, 0, env))
+        g_started = local_fire(unit, kind, UNIT_PLAYER, guid);   // +0x2B090: a nonzero answer runs +0x2A7C0
+}
+
+// A left click on a player unit (a live player or a corpse): +0x1AB20 type 0. In reach (D2Common #10407 under 5
+// with nothing between, #10324 mask 0x804) and past the gate the use starts and its 0x13 is in the send list;
+// otherwise the walk or run to it starts (0x02/0x04) and the use waits for +0x2B090. 1 something started,
+// 0 refused, -1 no local player or no client unit for that id.
+EMSCRIPTEN_KEEPALIVE int d2_realm_client_local_click_player(uint32_t guid, int run) {
+    using namespace unitclick;
+    D2UnitStrc* unit = selected_player_unit();
+    if (!unit) return -1;
+    D2UnitStrc* target = find_realm_client_unit(UNIT_PLAYER, guid);
+    if (!target || target == unit || !UNITS_GetRoom(target) || !UNITS_GetRoom(unit)) return -1;
+    if (unit->dwAnimMode == PLRMODE_DEATH || unit->dwAnimMode == PLRMODE_DEAD) return 0;
+    g_localRun = run != 0;
+    g_heroUnit = unit; g_targetUnit = target; g_type = UNIT_PLAYER; g_guid = guid; g_run = run != 0; g_started = 0;
+    fill(g_hero, unit); fill(g_target, target);
+    uint32_t frame[7] = {};
+    frame[1] = p32(&g_hero); frame[2] = p32(&g_target); frame[6] = run ? 0x04 : 0x02;   // +0x18: the walk or run action
+    uint32_t g97ec = 0, g9828 = 0, g3e4 = 0;
+    const uint32_t masks[2] = {};
+    const d2client_1ab20::Gl gl{ 0, &g97ec, &g9828, &g3e4, nullptr, masks };
+    d2client_1ab20::Fn fn{};
+    fn.cc70 = distance; fn.cf0a = collide; fn.s9f30 = gate; fn.s750 = use; fn.s7c0 = walk; fn.s2d50 = arm;
+    d2client_1ab20::sub_1AB20(UNIT_PLAYER, reinterpret_cast<const uint8_t*>(frame), static_cast<int32_t>(guid), gl, fn);
+    return g_started;
 }
 
 // The 0x5a line. The composer (0x7dfb0, with 0x7cfc0 for the party kinds) is run as retail runs it: every string
@@ -5676,6 +5771,8 @@ EMSCRIPTEN_KEEPALIVE int d2_realm_client_stock_price(const uint8_t* bytes, int l
         return -1;
     }
     UNITS_InitializeStaticPath(item, nullptr, 0, 0);
+    // The decode writes the quantity and durability into the unit's stat list; without one they are dropped and a stack prices as one.
+    if (!item->pStatListEx) STATLIST_AllocStatListEx(item, 0, nullptr, nullptr);
 
     int socketedItems = 0;
     BOOL failed = FALSE;

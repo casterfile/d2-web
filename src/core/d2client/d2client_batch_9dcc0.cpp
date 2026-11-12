@@ -81,35 +81,45 @@ static void sendFlag(const D2c9dEnv* e, const void* unit, uint32_t a, uint8_t su
 // 1.13c D2Client+0x9DE90
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_9de90(const D2c9dEnv* e, const void* unit, uint32_t a, uint32_t bx) { (void)bx; sendFlag(e, unit, a, 3, 4); }
 
-// 1.13c D2Client+0x9E520
-extern "C" EMSCRIPTEN_KEEPALIVE intptr_t d2_client_9e520(const D2c9dEnv* e, const uint8_t* unit, uint32_t a, uint32_t esi) {
-    int32_t id = rootId(e);
-    intptr_t ret = (intptr_t)e->root;
+// 1.13c D2Client+0x9E520: EDI = unit (record with +0x10 id, +0x20 and +0x22 words), ECX = the context word handed to 0x9D630, EBX/ESI are saved and restored.
+// Callees (retail registers and stack words): 0x9D630 (ECX, EDX = root id) entry, 0x9DCC0 (EAX = unit, EBX = 8), 0x4FD90 (EDX = root id, [esp] = 8, ret 4),
+// 0x14850 (EDX = unit id, [esp] = 4, [esp+4] = value, ret 8), 0x9D990 (), and the tail jump to 0x9E120. The return value is EAX at each exit.
+struct D2c9e520Env {
+    uint8_t* (*f9d630)(uint32_t ecx, int32_t edx);
+    void (*f9dcc0)(const uint8_t* unit, uint32_t ebx);
+    uint32_t (*f4fd90)(int32_t edx, uint32_t s0);
+    void (*f14850)(int32_t edx, uint32_t s0, uint32_t s1);
+    uint8_t* (*f9d990)(void);
+    uint32_t (*f9e120)(void);
+};
+extern "C" EMSCRIPTEN_KEEPALIVE uint32_t d2_client_9e520(const D2c9e520Env* e, const uint8_t* unit, uint32_t ecx, const uint8_t* root) {
+    const int32_t rid = root ? rd<int32_t>(root, 0xc) : -1;
+    uint32_t ret = (uint32_t)(uintptr_t)root;
     if (!unit) return ret;
-    int32_t uid = rd<int32_t>(unit, 0x10);
-    int32_t f = 0;
-    bool have = flagsOf(e, uid, id, &f);
+    const int32_t uid = rd<int32_t>(unit, 0x10);
+    uint8_t* ent = e->f9d630(ecx, rid);
     ret = 0;
-    if ((have && (f & 8)) || rd<uint16_t>(unit, 0x20) > 8) {
-        d2_client_9dcc0(e, unit, a, 8);
-        uint32_t r = e->fnffd90(uid, id, 8);
-        e->fn14850(uid, 4, r);
-        ret = (intptr_t)e->fnffd90(uid, id, 8);
-        if (ret && rd<uint16_t>(unit, 0x22) != 0xffff) {
-            uint8_t* o = e->fn9d990();
-            if (rd<uint16_t>(o, 0x22) == rd<uint16_t>(unit, 0x22)) {
-                uint8_t* p = e->fn9d630(e->root, rootId(e));
-                if (!p) e->fatal(0x4e3 + 0 * esi);
-                wr<uint16_t>(p, 0x22, 0xffff);
-                wr<int32_t>(p, 0x30, 1);
-                e->fn9da70();
-                e->fn772e0();
-                return (intptr_t)p;
-            }
-            ret = rd<uint16_t>(o, 0x22);
+    bool call = false;
+    if (ent) {
+        const uint8_t* head = rd<const uint8_t*>(ent, 0x34);
+        ret = (uint32_t)(uintptr_t)head;
+        if (head && rid != uid) {
+            const uint8_t* n = rd<const uint8_t*>(head, 0);
+            ret = 0;
+            for (; n; n = rd<const uint8_t*>(n, 8))
+                if (rd<int32_t>(n, 0) == uid) { ret = rd<uint32_t>(n, 4) & 8; call = ret != 0; break; }
         }
     }
-    return ret;
+    if (!call && rd<uint16_t>(unit, 0x20) < 9) return ret;
+    e->f9dcc0(unit, 8);
+    ret = e->f4fd90(rid, 8);
+    e->f14850(rd<int32_t>(unit, 0x10), 4, ret);
+    ret = e->f4fd90(rid, 8);
+    if (!ret || rd<uint16_t>(unit, 0x22) == 0xffff) return ret;
+    const uint8_t* o = e->f9d990();
+    const uint32_t w = rd<uint16_t>(o, 0x22);
+    if ((uint16_t)w != rd<uint16_t>(unit, 0x22)) return ((uint32_t)(uintptr_t)o & 0xffff0000u) | w;
+    return e->f9e120();
 }
 
 // ---- PE image loader (9E630 / 9E690). Win32 calls are seams. ----

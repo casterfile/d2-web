@@ -183,7 +183,7 @@ EMSCRIPTEN_KEEPALIVE void d2game_38470_impl(uint32_t param1, uint32_t param2, ui
 // 0x9BB10(0, unit). 0x7ADF0(self, unit, param_1) runs unconditionally. Ghidra materialises `self`
 // from extraout_ECX after each call; the register pass-through is transcribed as the parameter.
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6b200(uint32_t ecxSelf, uint32_t esiUnit, int32_t param1,
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_6B200(uint32_t ecxSelf, uint32_t esiUnit, int32_t param1,
                                              const D2GameBatchD40F0Env* env)
 {
     void* self = (void*)(uintptr_t)ecxSelf;

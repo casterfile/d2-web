@@ -204,7 +204,7 @@ void d2_fn_d2game_6E930(uint32_t eax, A ebx, A esi, uint32_t skillWord, const D2
 // the owning client). o11088 = ITEMS_GetItemType, o10083/o10782 = ITEMS_Get/SetEarName, o10588/o10467 =
 // ITEMS_Get/SetEarLevel, o10977 = ITEMS_SetItemFlag, o10202 = ITEMS_CheckItemFlag(item, flag, line, file).
 extern "C" EMSCRIPTEN_KEEPALIVE
-void d2_fn_d2game_70010(A dst, A src, A bSet, const D2GameBatch6E400Env* e)
+void d2game_legacy_70010(A dst, A src, A bSet, const D2GameBatch6E400Env* e)
 {
     if (e->o11088(dst) == 7) {                          // ITEMTYPE_PLAYER_BODY_PART
         e->o10782(dst, e->o10083(src));

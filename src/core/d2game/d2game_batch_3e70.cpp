@@ -172,7 +172,7 @@ EMSCRIPTEN_KEEPALIVE int32_t d2_game_3ed8(void) {
 // statically-backed locks (flag == 1) without freeing their in-module storage. The record layout shares
 // g_crtLockTable with __mtinitlocknum (0x3F8B) and __unlock (0x3F76).
 extern "C"
-EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3f21(void) {
+EMSCRIPTEN_KEEPALIVE void d2_fn_d2game_3F21(void) {
     for (auto& slot : g_crtLockTable) {
         if (slot.section != nullptr && slot.staticFlag != 1) {
             DeleteCriticalSection((LPCRITICAL_SECTION)slot.section);

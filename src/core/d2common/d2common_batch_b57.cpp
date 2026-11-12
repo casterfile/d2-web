@@ -17,7 +17,7 @@ static_assert(offsetof(D2ItemTypesTxt, nClass) == 0x21, "itemtypes.txt nClass");
 // 1.13c D2Common+0x24280 (#10822): itemtypes.txt nClass of the unit's item type; a non-item,
 // a missing row or nClass >= 7 answers 7. Retail calls 0x230F0 for the item type id.
 extern "C"
-EMSCRIPTEN_KEEPALIVE uint8_t d2_fn_d2common_24280(const D2UnitStrc* pUnit)
+EMSCRIPTEN_KEEPALIVE uint8_t d2_port_d2common_24280(const D2UnitStrc* pUnit)
 {
 	if (!pUnit || pUnit->dwUnitType != UNIT_ITEM)
 		return 7;

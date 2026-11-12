@@ -45,7 +45,7 @@ uint32_t D2Client_Map2C830(uint32_t n);
 extern "C" D2UnitStrc* d2_session_target_player_unit();
 extern "C" void* d2_client_skilldesc_for_skill(int32_t nSkillId);
 extern "C" int32_t d2_fn_d2common_4f930_port(D2UnitStrc* pUnit, int32_t nMin);
-extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_fn_d2common_39430(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer);
+extern "C" EMSCRIPTEN_KEEPALIVE int32_t d2_port_d2common_39430(D2UnitStrc* pUnit, int32_t nStatId, uint16_t nLayer);
 
 // The env layouts of the D2Common ports (d2common_batch_22ec0.cpp, d2common_51ff0.cpp, d2common_batch_4d840.cpp).
 struct D2Common52100Env {
@@ -104,7 +104,7 @@ I finishingUnreached() { return 0; }
 void finishing2F980Unreached(P, I*, I*, I*) {}
 int16_t strBonus(P item) { return ITEMS_GetStrengthBonus(U_(item)); }
 int16_t dexBonus(P item) { return ITEMS_GetDexBonus(U_(item)); }
-I itemStat(P item, I id, I layer) { return d2_fn_d2common_39430(U_(item), id, uint16_t(layer)); }
+I itemStat(P item, I id, I layer) { return d2_port_d2common_39430(U_(item), id, uint16_t(layer)); }
 I damBlue(P u) { return STATES_CheckStateMaskDamBlueOnUnit(U_(u)); }
 I damRed(P u) { return STATES_CheckStateMaskDamRedOnUnit(U_(u)); }
 // D2Client+0xD69B4: colours, the stat rows (min, max, mastery percent or -1), and FINISHING = Fog gdwBitMasks[3]

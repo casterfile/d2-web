@@ -40,6 +40,7 @@ export const packets = Object.freeze({
   socketItem: (cursorGuid, itemGuid) => make(0x28, le32(cursorGuid), le32(itemGuid)),   // 9
   scrollToBook: (scrollGuid, bookGuid) => make(0x29, le32(scrollGuid), le32(bookGuid)), // 9
   itemToCube: (itemGuid, cubeGuid) => make(0x2a, le32(itemGuid), le32(cubeGuid)),       // 9
+  useOnItem: (targetGuid, useGuid) => make(0x27, le32(targetGuid), le32(useGuid)),      // 9: D2Client 0x95FE0 -> 0x14910 [0x27][clicked item][armed item]; D2GSPacketClt27
   useItem: (guid, x, y) => make(0x20, le32(guid), le32(x), le32(y)),        // 13
   useBeltItem: (guid, onMerc = false) => make(0x26, le32(guid), le32(onMerc ? 1 : 0), le32(0)), // 13
   npcChatStart: (type, guid) => unit(0x2f, type, guid),             // 9
@@ -112,6 +113,9 @@ const CODE_QF2 = 0x20326671, CODE_HFH = 0x20686668;
  *                                    skill), 1 use it at the spot.
  *   skillAt(hand, x, y), skillOnUnit(hand, type, guid) -> the local start of a hand's skill
  *   refusalSound() -> the Sounds event the last refused start speaks (0 none); onRefused(event) plays it
+ *   clickPlayer(guid, run)        -> the engine's click on a player unit, a live player or a corpse (D2Client 0x1AB20
+ *                                    type 0, its waiting use gated on arrival by 0x2AFB0): 1 started, 0 refused, -1 no
+ *                                    client unit. Its packets are read with takeSends. Without it a player click sends nothing.
  */
 /** D2Client+0x29920 on an Items.txt row: true only for a plain useable row (useable byte 1, unique and quest bytes not 1). */
 export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && row.quest !== 1;
@@ -119,7 +123,7 @@ export const canUseItemRow = (row) => row.useable === 1 && row.unique !== 1 && r
 export const ACTION_LOCK_FRAMES = 12, GAME_FRAME_MS = 40;
 export function createRealmInput({ transmit, scene, now = () => 0, move = null, approachUnit = null, reach = null,
   actionDone = null, skillPlan = null, skillAt = null, skillOnUnit = null, onTalk = null, questFlags = null, leaveWait = null,
-  queueUnit = null, fireUnit = null, takeSends = null, refusalSound = null, onRefused = null }) {
+  queueUnit = null, clickPlayer = null, fireUnit = null, takeSends = null, refusalSound = null, onRefused = null }) {
   const gate = createSendGate(transmit);
   const evidence = { attempts: 0, sent: 0, last: null };
   // The inventory's item actions pass the leave wait's gate first (1.13c 0x923F0): an armed wait is cancelled and the action refused.
@@ -161,12 +165,13 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
   }
   const clamp16 = (v) => Math.max(0, Math.min(0xffff, v | 0));
   // Without the engine's reach test: five tiles each way is inside the server's talk range (fewer than 9 by
-  // its size-aware distance) from every side; an item or object is used from two tiles.
+  // its size-aware distance) from every side; an item or object is used from two tiles. A player unit never
+  // comes here: its click and arrival are the engine's (clickPlayer).
   const inReach = (s, type, u) => {
     if (pending?.hand != null) return plan(pending.hand, type, idOf(type, u)) !== 0;
     if (reach) { const r = reach(type, idOf(type, u)); if (r != null && r !== -1) return Boolean(r); }
     const d = Math.max(Math.abs(u.x - s.player.x), Math.abs(u.y - s.player.y));
-    return d <= (type === UNIT.MONSTER || type === UNIT.PLAYER ? 5 : type === UNIT.TILE ? 4 : 2);
+    return d <= (type === UNIT.MONSTER ? 5 : type === UNIT.TILE ? 4 : 2);
   };
   const idOf = (type, u) => (type === UNIT.MONSTER || type === UNIT.PLAYER ? u.guid : u.id);
   // A corpse is a player unit lying in mode DEAD; the server opens it only in that mode. Any other player unit is one of the other players.
@@ -241,7 +246,7 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     const guid = idOf(type, u);
     if (!started && fireUnit && takeSends) { fireUnit(0x13, type, guid); takeSends(); }   // the engine's own start; the packet goes out below
     if (type === UNIT.ITEM) return emit(packets.pickUp(UNIT.ITEM, guid), 'pickup');
-    if (type === UNIT.PLAYER) return emit(packets.interact(UNIT.PLAYER, guid), corpseOf(s, guid) ? 'corpse' : 'trade');   // a live player in town: the server answers with a trade request
+    if (type === UNIT.PLAYER) return emit(packets.interact(UNIT.PLAYER, guid), corpseOf(s, guid) ? 'corpse' : 'trade');   // a corpse is opened; a live player: the server's answer (a trade request, or a refusal) decides
     if (type === UNIT.TILE) return emit(packets.interact(UNIT.TILE, guid), 'warp');   // the server moves the player through the exit
     if (type === UNIT.MONSTER) {
       const sent = emit(packets.interact(UNIT.MONSTER, guid), 'talk');
@@ -286,12 +291,15 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
       }
       if (held && hit.kind !== 'ground') return hit;               // a held button does not repeat a pickup or a talk
       pending = null;
-      // Another player: the click walks up and interacts, in town or out of it. The client's click on a player unit
-      // (1.13c D2Client 0x1AB20, unit type 0) tests only the distance and the line to it, and the action it queues is
-      // gated on arrival (0x2AFB0) by the target's own state (down, or not targetable) -- never by the town. Whether
-      // the interact is honoured outside town is the server's answer.
-      const type = hit.kind === 'player' ? UNIT.PLAYER : hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : hit.kind === 'warp' ? UNIT.TILE
-        : hit.kind === 'corpse' ? UNIT.PLAYER : null;
+      // A player unit, live or a corpse: the engine's click (1.13c D2Client 0x1AB20 type 0) decides the use or the
+      // walk, and the arrival gate (0x2AFB0) decides the waiting use; the page sends what the engine started.
+      if (hit.kind === 'player' || hit.kind === 'corpse') {
+        if (!clickPlayer || !takeSends) return false;
+        const started = clickPlayer(hit.unit.guid, Boolean(s.run));
+        evidence.localMove = started;
+        return flush(s) ? hit : false;
+      }
+      const type = hit.kind === 'npc' ? UNIT.MONSTER : hit.kind === 'item' ? UNIT.ITEM : hit.kind === 'object' ? UNIT.OBJECT : hit.kind === 'warp' ? UNIT.TILE : null;
       if (type != null) return interactWith(s, type, hit.unit) === false ? false : hit;
       const x = clamp16(world.x), y = clamp16(world.y);
       if (!startRoute(x, y, s.run)) return false;
@@ -411,6 +419,8 @@ export function createRealmInput({ transmit, scene, now = () => 0, move = null, 
     combine: (action, cursorGuid, itemGuid) => { const b = { stack: packets.stackItems, socket: packets.socketItem, scroll: packets.scrollToBook, cube: packets.itemToCube }[action];
       return Boolean(b) && itemGate() && emit(b(cursorGuid, itemGuid), `combine-${action}`); },
     unstack: (guid) => itemGate() && emit(packets.unstackItem(guid), 'unstack'),
+    /** The identify cursor's press on an item (0x27): the item under the click, then the armed scroll or tome; the same id twice cancels. */
+    useOnItem: (targetGuid, useGuid) => itemGate() && emit(packets.useOnItem(targetGuid, useGuid), 'use-on-item'),
     swapBody: (guid, bodyLoc) => itemGate() && emit(packets.swapWithBody(guid, bodyLoc), 'swap-body'),
     /** A click on a ground item by id: walk to it and pick it up (0x16) once in reach, as leftClick does for the item under the pointer. */
     pickUp(guid) { const s = open(), u = s?.items.find((i) => i.id === guid && i.mode === 3); return Boolean(u) && itemGate() && interactWith(s, UNIT.ITEM, u) !== false; },

@@ -134,16 +134,16 @@ struct HookEnv {
     }
     uint32_t widTag(const void* p) const { uint32_t o = (uint32_t)((const uint8_t*)p - (const uint8_t*)widBuf); return o < sizeof widBuf ? 0xB4000000u | o : (uint32_t)(uintptr_t)p; }
     uint32_t h(uint32_t rva, uint32_t a = 0, uint32_t c = 0, uint32_t d = 0, uint32_t b = 0, uint32_t s = 0,
-               uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0, uint32_t s6 = 0) {
+               uint32_t s0 = 0, uint32_t s1 = 0, uint32_t s2 = 0, uint32_t s3 = 0, uint32_t s4 = 0, uint32_t s5 = 0, uint32_t s6 = 0, uint32_t s7 = 0, uint32_t s8 = 0, uint32_t s9 = 0, uint32_t s10 = 0) {
         if (L[0] >= cap) abort();   // log capacity exceeded
         uint32_t* e = L + 1 + L[0]++ * 10;
         e[0] = rva; e[1] = a; e[2] = c; e[3] = d; e[4] = b; e[5] = s; e[6] = s0; e[7] = s1; e[8] = s2; e[9] = s3;
         // retail logs a pointer into its stack as 0xB3000000; `hookw` out-parameter writes ride in sc as key ((1+stack word)<<24)|rva, or ((0x10+r)<<24)|rva for register r (a c d b s = 0..4); several pairs with one key fill consecutive dwords of that pointee
         if (!s5) s5 = xs5; if (!s6) s6 = xs6; xs5 = xs6 = 0;
-        const uint32_t sw[7] = { s0, s1, s2, s3, s4, s5, s6 };
+        const uint32_t sw[11] = { s0, s1, s2, s3, s4, s5, s6, s7, s8, s9, s10 };
         { bool raw = false; for (int q = 0; q < nraw; q++) raw |= rawRva[q] == rva; if (!raw) for (int i = 1; i < 10; i++) if (isStk(e[i])) e[i] = 0xB3000000u; }   // `hooknostk RVA`: noStk(rva) keeps that hook's words raw
         const uint32_t rg[6] = { a, c, d, b, s, ediReg }; ediReg = 0;
-        for (int kind = 0; kind < 2; kind++) for (uint32_t w = 0; w < (kind ? 6u : 7u); w++) {
+        for (int kind = 0; kind < 2; kind++) for (uint32_t w = 0; w < (kind ? 6u : 11u); w++) {
             const uint32_t key = ((kind ? 0x10u + w : 1u + w) << 24) | rva, ptr = kind ? rg[w] : sw[w]; uint32_t off = 0;
             for (const uint32_t* p = sc; p[0]; p += 2) if (p[0] == key) { wr32(ptr + off, p[1]); off += 4; }
         }

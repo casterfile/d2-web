@@ -10,12 +10,13 @@ uint32_t d2game_61340_q32(const Call& X, uint32_t game, uint32_t client) {
     if (rd8(d, 0x95)) return 1;
     uint32_t room = X(0xA478, 0, 0, 0, 0, 0, client);
     uint32_t x = rd32(d, 0x9c), y = rd32(d, 0xa0);
-    if (!X(0x1280, room, 0, 0, x)) {
+    uint32_t ok = X(0x1280, room, 0, 0, x);
+    if (!ok) {
         wr32(d, 0x9c, x + 3);
         wr32(d, 0xa0, y + 3);
         return 1;
     }
-    uint32_t u = X(0xE1D90, 0, 2, 0xbd, 0, 0, x, y, game, room);
+    uint32_t u = X(0xE1D90, 0, 2, 0xbd, 0, 0, x, y, game, ok);   // retail's fourth logged stack word is the 0x1280 result still in that slot (1), not the room
     if (u) { wr8(d, 0x95, 1); wr32(d, 0x98, rd32(u, 0xc)); }
     return 1;
 }

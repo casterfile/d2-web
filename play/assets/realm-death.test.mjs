@@ -30,8 +30,27 @@ test('corpse views join the corpse list to the player units in view', () => {
   assert.deepEqual(realmCorpseViews(pairs, [], HERO), []);
 });
 
+// A stand-in for the engine's click on a player unit (D2Client 0x1AB20) and the arrival check of the use it
+// leaves waiting (0x2AFB0): in reach (under 5 tiles) the use starts, else the walk does and the use waits; on
+// arrival it starts only while the corpse is still the hero's to open. The engine's own answers are its tests'.
+function enginePlayerClick(hero, where, allowed) {
+  let sends = [], waiting = 0;
+  const near = (guid) => { const u = where(guid), me = hero(); return Math.max(Math.abs(u.x - me.x), Math.abs(u.y - me.y)) < 5; };
+  return {
+    clickPlayer: (guid, run) => {
+      if (near(guid) && allowed(guid)) { sends.push({ op: 0x13, type: 0, guid }); waiting = 0; }
+      else { sends.push({ op: run ? 0x04 : 0x02, type: 0, guid }); waiting = guid; }
+      return 1;
+    },
+    takeSends: () => {
+      if (waiting && near(waiting)) { if (allowed(waiting)) sends.push({ op: 0x13, type: 0, guid: waiting }); waiting = 0; }
+      const s = sends; sends = []; return s;
+    },
+  };
+}
+
 test('die, respawn, walk back, loot the corpse: the packets sent', () => {
-  const out = [], moves = [];
+  const out = [];
   const players = [{ guid: CORPSE, x: 120, y: 100, renderState: { mode: 17 } }, { guid: OTHER_CORPSE, x: 60, y: 100, renderState: { mode: 17 } }];
   let pairs = [], me = { x: 120, y: 100 }, mode = 1;
   const scene = () => ({ ready: true, player: me, run: false, selected: { left: 0, right: 36 }, monsters: [], objects: [], items: [],
@@ -39,8 +58,9 @@ test('die, respawn, walk back, loot the corpse: the packets sent', () => {
     toScreen: (x, y) => ({ x: x * 2, y }), pointerWorld: (px, py) => ({ x: px / 2, y: py }),
     corpses: realmCorpseViews(pairs, players, HERO) });
   let clock = 0;
-  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene, now: () => clock,
-    move: (x, y, run) => { moves.push([x, y, run]); return 1; } });
+  const engine = enginePlayerClick(() => me, (g) => players.find((p) => p.guid === g),
+    (g) => realmCorpseViews(pairs, players, HERO).some((c) => c.guid === g && corpseLootable(c)));
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), scene, now: () => clock, move: () => 1, ...engine });
 
   // Falling: the screen is up, the respawn key is not yet taken.
   mode = 0; assert.ok(deathScreenShown(mode)); assert.equal(respawnAllowed(mode), false);
@@ -59,7 +79,6 @@ test('die, respawn, walk back, loot the corpse: the packets sent', () => {
   clock += 1000; const hit = input.leftClick(240, 100);
   assert.equal(hit.kind, 'corpse');
   assert.deepEqual(out.at(-1), [0x02, 0, 0, 0, 0, ...le(CORPSE)]);
-  assert.deepEqual(moves.at(-1), [120, 100, false]);
   const before = out.length;
   input.tick(); assert.equal(out.length, before);
   me = { x: 119, y: 100 };
@@ -132,7 +151,9 @@ test('a click on another player\'s corpse: the packets with and without permissi
   const pairs = [{ owner: OTHER, corpse: OTHER_CORPSE }];
   const roster = twoPlayers();
   let me = { x: 100, y: 100 }, clock = 0;
-  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => clock, move: () => 1,
+  const engine = enginePlayerClick(() => me, (g) => players.find((p) => p.guid === g),
+    (g) => realmCorpseViews(pairs, players, HERO, roster).some((c) => c.guid === g && corpseLootable(c)));
+  const input = createRealmInput({ transmit: (b) => out.push(Array.from(b)), now: () => clock, move: () => 1, ...engine,
     scene: () => ({ ready: true, player: me, run: false, selected: { left: 0, right: 0 }, monsters: [], objects: [], items: [], playerMode: 5,
       isNpc: () => false, hoverBox: () => false, toScreen: (x, y) => ({ x: x * 2, y }), pointerWorld: (px, py) => ({ x: px / 2, y: py }),
       corpses: realmCorpseViews(pairs, players, HERO, roster) }) });

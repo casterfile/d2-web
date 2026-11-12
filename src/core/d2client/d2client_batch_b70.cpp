@@ -61,11 +61,11 @@ extern "C" int32_t d2client_FUN_6fb473c0(uint8_t* msg) {
   int32_t y = *(uint16_t*)(msg + 0xe), x = *(uint16_t*)(msg + 0xc);
   DAT_6fbbb2a4 = x; DAT_6fbbb430 = y;
   *(int32_t*)(msg + 0x18) = 1; *(int32_t*)(msg + 0x1c) = 0;
-  Ordinal_511(nullptr);
+  Ordinal_511(msg);
   if (DAT_6fbbb2f8 <= x && x < DAT_6fbbb2fc && DAT_6fbbb300 <= y && y <= DAT_6fbbb304) {
     if (FUN_6fb3bd90(x, y) != 0 && DAT_6fbcbedc != 0) {
       *(int32_t*)(msg + 0x18) = 1; *(int32_t*)(msg + 0x1c) = 0;
-      Ordinal_511(nullptr);
+      Ordinal_511(msg);
       FUN_6fb4fd70();
     }
     DAT_6fbcbedc = 0;

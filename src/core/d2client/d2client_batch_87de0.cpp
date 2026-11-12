@@ -7,22 +7,7 @@
 #include <cstring>
 #include <emscripten.h>
 
-struct D2cSnd87 {
-    void**   list;     // +0x10BF30 DAT_6fbcbf30 head
-    uint8_t* recs;     // +0x10C24C
-    int32_t  count;    // +0x10C250
-    int32_t  now;      // +0x10C268
-    int32_t  lo, hi;   // +0x10C25C / +0x10C260
-    uint32_t player;   // +0x10BBFC
-};
-struct D2cSnd87Env {
-    uint32_t (*ord10032)(void);
-    void     (*ord10006)(void);
-    void     (*ord10062)(void);   // per-node call in 88150 (args implicit in retail)
-    void     (*ord10063)(void);
-    void     (*fn87ed0)(int32_t now, uint32_t key, int32_t mode);
-    void     (*fatal)(uint32_t code); // Ordinal_10265+10024+_exit(-1); no return
-};
+#include "d2snd87_seam.h"
 
 template <class T> static T rd(const uint8_t* p, size_t o) { T v; memcpy(&v, p + o, sizeof v); return v; }
 template <class T> static void wr(uint8_t* p, size_t o, T v) { memcpy(p + o, &v, sizeof v); }
@@ -121,15 +106,19 @@ static void snd_kick(D2cSnd87* s, const D2cSnd87Env* e, uint8_t* p) {   // 1.13c
     uint8_t* r = rec(s, rd<int32_t>(p, 4));
     wr<int32_t>(p, 0x3d, 1);
     int32_t k = rd<int32_t>(p, 8);
-    if (rd<uint8_t>(r, 0x40) != 0 && rd<int32_t>(p, 0x30) == 1) d2_client_88230(s, e, k, 0, 0, 0);
+    if (rd<uint8_t>(r, 0x40) != 0 && rd<int32_t>(p, 0x30) == 1) d2_client_88230(s, e, k, 0, 0, rd<uint8_t>(r, 0x40));   // retail: EAX = rec[0x40] (the base duration), stack key, 0, 0
 }
 
 // 1.13c D2Client+0x88550 (entry in ECX)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88550(D2cSnd87* s, const D2cSnd87Env* e, uint8_t* p) { snd_kick(s, e, p); }
 
 // shared walk: kick every entry whose record index satisfies pred
-template <class F> static void walk(D2cSnd87* s, const D2cSnd87Env* e, F pred) {
-    for (void** n = s->list; n; n = (void**)n[1]) if (pred(ent(n))) snd_kick(s, e, ent(n));
+// via550: the caller reaches the kick through a call to 0x88550 (0x88770, 0x88810, 0x886F0); 0x888B0 has it inlined
+template <bool via550 = true, class F> static void walk(D2cSnd87* s, const D2cSnd87Env* e, F pred) {
+    for (void** n = s->list; n; n = (void**)n[1]) {
+        if (!pred(ent(n))) continue;
+        if (via550 && e && e->fn88550) e->fn88550(ent(n)); else snd_kick(s, e, ent(n));
+    }
 }
 
 // 1.13c D2Client+0x886F0 (idx 0xb76..0x1230)
@@ -157,5 +146,5 @@ extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_88810(D2cSnd87* s, const D2cSnd87
 
 // 1.13c D2Client+0x888B0 (idx lo..hi)
 extern "C" EMSCRIPTEN_KEEPALIVE void d2_client_888b0(D2cSnd87* s, const D2cSnd87Env* e) {
-    walk(s, e, [&](uint8_t* p) { int32_t i = rd<int32_t>(p, 4); return s->lo <= i && i <= s->hi; });
+    walk<false>(s, e, [&](uint8_t* p) { int32_t i = rd<int32_t>(p, 4); return s->lo <= i && i <= s->hi; });
 }

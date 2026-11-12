@@ -98,7 +98,7 @@ EMSCRIPTEN_KEEPALIVE void d2c_81340(const D2cB69Env* e) {
     *e->g_d3430 = (int32_t)v4; *e->g_d3434 = (int32_t)v5;
     if (!u) { e->fatal(0x547); return; }
     uint64_t* seed = (uint64_t*)(u + 0x20);
-    if (*e->g_bf70 < *e->g_97f8) {
+    if ((uint32_t)*e->g_bf70 < (uint32_t)*e->g_97f8) {   // retail cmp eax,ecx; jbe: unsigned
         *e->g_bf70 = *e->g_97f8;
         if (!v5) *e->g_c38f4 = 0;
         else {
