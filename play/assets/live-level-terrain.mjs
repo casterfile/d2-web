@@ -42,19 +42,54 @@ export function realmTerrainFor(owner, act0, make) {
   return terrain;
 }
 
-/** The client-mode DRLG tiles activated by D2GS 0x07 MapReveal packets. */
-export function loadRealmClientTerrain(Module, act0) {
-  try {
-    if (!Module._d2_drlg_client_tiles || !Module._d2_drlg_client_tile_count) throw new Error('client DRLG tile exports are unavailable');
+/** Read already-active client terrain, including the rooms across an open level seam. */
+export function readRealmClientTerrain(Module, levels = []) {
+  const select = Module._d2_drlg_client_select_render_level && Module._d2_drlg_client_render_level;
+  const original = select ? Module.ccall('d2_drlg_client_render_level', 'number', [], []) : null;
+  const tiles = [], files = [];
+  let roomBase = 0;
+  const read = (level, seam) => {
     const count = Module.ccall('d2_drlg_client_tile_count', 'number', [], []);
     const ptr = Number(Module.ccall('d2_drlg_client_tiles', 'number', [], []));
-    const tiles = count > 0 && ptr > 0 ? parseSessionTiles(Module.HEAPU8, ptr, count) : [];
+    const part = count > 0 && ptr > 0 ? parseSessionTiles(Module.HEAPU8, ptr, count) : [];
     const entryPtr = count > 0 ? Number(Module.ccall('d2_drlg_client_tile_entries', 'number', [], [])) : 0;
     if (entryPtr) {
       const entries = new Uint32Array(Module.HEAPU8.buffer, entryPtr, count);
-      tiles.forEach((tile, i) => { tile.entry = entries[i]; });
+      part.forEach((tile, i) => { tile.entry = entries[i]; });
     }
-    const files = readLevelTileFiles(Module, 4096, 'd2_drlg_client_tile_files');
+    if (!part.length) return;
+    const localFiles = readLevelTileFiles(Module, 4096, 'd2_drlg_client_tile_files'), fileBase = files.length;
+    files.push(...localFiles);
+    let maxRoom = -1;
+    for (const tile of part) {
+      maxRoom = Math.max(maxRoom, tile.room);
+      tiles.push({ ...tile, level, room: tile.room + roomBase,
+        librarySlot: tile.librarySlot < localFiles.length ? tile.librarySlot + fileBase : tile.librarySlot,
+        ...(seam ? { seam: true } : {}) });
+    }
+    roomBase += maxRoom + 1;
+  };
+  try {
+    read(original, false);
+    if (select) for (const level of new Set(levels)) {
+      if (!Number.isInteger(level) || level <= 0 || level === original) continue;
+      // Selecting a tile buffer does not reveal/activate rooms. It only reads
+      // the rooms the server already supplied, as the session seam reader does.
+      if (Module.ccall('d2_drlg_client_select_render_level', 'number', ['number'], [level])) read(level, true);
+    }
+  } finally {
+    // These buffers belong to the native client; restore its current-level
+    // selector even if a library read fails while collecting a neighbor.
+    if (select) Module.ccall('d2_drlg_client_select_render_level', 'number', ['number'], [original]);
+  }
+  return { tiles, files };
+}
+
+/** The client-mode DRLG tiles activated by D2GS 0x07 MapReveal packets. */
+export function loadRealmClientTerrain(Module, act0, levels = []) {
+  try {
+    if (!Module._d2_drlg_client_tiles || !Module._d2_drlg_client_tile_count) throw new Error('client DRLG tile exports are unavailable');
+    const { tiles, files } = readRealmClientTerrain(Module, levels);
     if (!files.length || !tiles.length) return { terrain: null, files, tiles, error: 'MapReveal has not activated drawable client rooms' };
     const palettePath = ACT_PALETTES[act0];
     if (!palettePath) throw new RangeError(`unsupported act ${act0 + 1}`);

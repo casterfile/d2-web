@@ -13,7 +13,7 @@ const release = 'v0.1.101';
 const apkHash = '08c484e1291e9c9dc39d5d87a9a1522361c7f0514b14bffa6db22874af10df14';
 const engineVersion = '60388b19d2cf';
 const upstreamCommit = '106f51d1ab3d3f368f21467d556bab6766b301a8';
-const overlays = ['gameplay-shell.mjs', 'assets/game-menu.mjs', 'assets/realm-npc-state.mjs', 'assets/realm-npc-screen.mjs'];
+const overlays = ['gameplay-shell.mjs', 'assets/game-menu.mjs', 'assets/realm-npc-state.mjs', 'assets/realm-npc-screen.mjs', 'assets/live-level-terrain.mjs'];
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 const exists = path => access(path).then(() => true, () => false);
 const cache = join(root, 'retail/releases/downloads');

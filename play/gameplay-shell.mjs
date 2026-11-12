@@ -4597,7 +4597,8 @@ async function syncRealmScene() {
   if (!window.__d2?.ready || !Module._d2_drlg_client_tiles) return;
   try {
     ensureRealmChrome();
-    const loaded = loadRealmClientTerrain(Module, realmWorldView.act);
+    const loaded = loadRealmClientTerrain(Module, realmWorldView.act,
+      (realmFlow?.protocol?.d2gsClientRooms?.() ?? []).map(room => room.level));
     if (!loaded.terrain) throw new Error(loaded.error || 'client DRLG has no drawable terrain');
     terrain = loaded.terrain; terrainFiles = loaded.files; terrainError = '';
     realmSceneTiles = loaded.tiles;
