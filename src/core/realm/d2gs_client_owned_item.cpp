@@ -49,6 +49,9 @@ D2UnitStrc* decode_item(uint32_t guid, const uint8_t* bytes, int length) {
     auto* item = UNITS_AllocUnit(nullptr, UNIT_ITEM);
     if (!item) return nullptr;
     item->dwUnitId = guid;
+    // Upstream a650f49b: decode into an allocated stat list, so real item
+    // properties (including the starter wand's +1 Raise Skeleton) survive.
+    STATLIST_AllocStatListEx(item, 0, nullptr, nullptr);
 
     ITEMS_AllocItemData(nullptr, item);
     if (!item->pItemData) {
