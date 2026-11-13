@@ -10720,6 +10720,14 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
             case 12: return pre("+", "") + body(v) + post("+", "");
             case 13: { const D2CharStatsTxt* cs = UNITS_GetCharStatsTxtRecord(st.nLayer); return cs ? "+" + std::to_string(v) + " " + str(cs->wStrAllSkills) : ""; }
             case 14: { const D2CharStatsTxt* cs = UNITS_GetCharStatsTxtRecord((st.nLayer >> 3) & 3); return cs ? subst(str(cs->wStrSkillTab[st.nLayer & 7]), { v }) + " " + str(cs->wStrClassOnly) : ""; }
+            case 27: {   // D2Client+0x54E10 case 27: signed value, string 0xFA3, skill name, owning class's Only string.
+                const int sk = st.nLayer;
+                const D2SkillsTxt* sr = sk >= 0 && sk < sgptDataTables->nSkillsTxtRecordCount ? DATATBLS_GetSkillsTxtRecord(sk) : nullptr;
+                const D2SkillDescTxt* sd = sr ? DATATBLS_GetSkillDescTxtRecord(sr->wSkillDesc) : nullptr;
+                if (!v || !sd) return "";
+                const D2CharStatsTxt* cs = sr->nCharClass >= 0 && sr->nCharClass < 7 ? UNITS_GetCharStatsTxtRecord(sr->nCharClass) : nullptr;
+                const std::string space = str(3995);
+                return std::string(v > 0 ? "+" : "") + std::to_string(v) + space + str(4003) + space + str(sd->wStrName) + space + (cs ? str(cs->wStrClassOnly) : ""); }
             case 19: return subst(body(v), { v });
             case 24: {   // 1.13c D2Client+0x54E10 case 0x18: "Level <lvl> <skill> (<cur>/<max> Charges)"; layer = skill << 6 | level, value = cur | max << 8
                 const int sk = st.nLayer >> 6;
@@ -10729,7 +10737,7 @@ EMSCRIPTEN_KEEPALIVE uint32_t d2_session_item_lines(uint32_t itemId, char* buf, 
                 return str(21249) + str(3995) + std::to_string(st.nLayer & 0x3f) + str(3995) + str(sd->wStrName) + str(3995) + subst(pos, { v & 0xff, v >> 8 }); }
             case 20: v = -v; return pre("", "%") + body(v) + post("", "%");
             case 21: v = -v; return pre("", "") + body(v) + post("", "");
-            default: return "";   // 11, 15-18, 22-23, 25-28: replenish, skill procs/auras, by-time, skill names: not ported
+            default: return "";   // 11, 15-18, 22-23, 25-26, 28: replenish, skill procs/auras, by-time, oskills: not ported
             } };
         std::map<int, std::vector<const D2StatStrc*>> groups;
         for (const D2StatStrc& st : sv) {
