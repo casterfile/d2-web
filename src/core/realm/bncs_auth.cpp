@@ -61,7 +61,9 @@ struct BnKeyContextEnv {
     void (*sha1_message)(uint8_t* digest, const void* data, uint32_t len);
     void (*decode26)(const char* key, uint32_t* out1, uint32_t* out2, uint8_t* hash10);
 };
-extern "C" int32_t bnclient_batch_103b0(uint32_t* self, uint32_t timestamp, uint32_t tag, const char* key, const BnKeyContextEnv* env);
+// Upstream keeps this optional backend outside its published source tree. A
+// clean engine build must report its absence, never synthesize key proof bytes.
+extern "C" __attribute__((weak)) int32_t bnclient_batch_103b0(uint32_t* self, uint32_t timestamp, uint32_t tag, const char* key, const BnKeyContextEnv* env);
 namespace d2::bnclient::grid { void broken_hash(uint32_t* output, const void* input, uint32_t length); }
 extern "C" void bn_sha1_message_1240(uint8_t* digest, const uint8_t* data, uint32_t length);
 
@@ -242,11 +244,13 @@ uint32_t lookup(uint32_t* a, uint32_t* b, char* i) {
 }  // namespace
 
 // Returns the body length, 0 when the revision check fails (retail sends nothing), or -1 when a CD key does not
-// decode (0x103B0 refused it). *seed is BNClient's running seed: in, then out as the client token at body +0.
+// decode (0x103B0 refused it), or -2 when that optional backend is absent.
+// *seed is BNClient's running seed: in, then out as the client token at body +0.
 extern "C" EMSCRIPTEN_KEEPALIVE int d2_realm_bncs_auth_check_env(uint32_t* seed, uint32_t now, uint32_t tick, uint32_t serverToken, int expansion,
                                                                 const char* formula, const char* mpq, const uint8_t* files, const uint32_t* sizes,
                                                                 const char* exeTime, const char* key0, const char* key1, const char* owner,
                                                                 uint8_t* out) {
+    if (!bnclient_batch_103b0) return -2;
     check::out = out; check::outLen = 0; check::badKey = 0;
     check::now = now; check::tick = tick; check::expansion = expansion ? 1 : 0;
     check::formula = formula; check::mpq = mpq; check::files = files; check::sizes = sizes; check::exeTime = exeTime;

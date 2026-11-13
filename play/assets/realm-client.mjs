@@ -1143,6 +1143,7 @@ export function bindEngineProtocol(Module, scratch = 65536, host = {}) {
           ['bigint', 'number', 'number', 'number', 'number', 'string', 'string', 'bigint', 'bigint', 'string', 'string', 'string', 'string', 'bigint'],
           [BigInt(SEED), env.time(), env.tick(), serverToken, expansion, challengeStr, mpq, BigInt(F), BigInt(Z), auth.exeTime,
             keys[0], keys[1] ?? '', auth.keyOwner ?? '', BigInt(O)]);
+        if (n === -2) throw new Error('AUTH_CHECK: this engine build does not include key authentication support for this server');
         if (n === -1) throw new Error('AUTH_CHECK: a configured CD key does not decode');
         if (n <= 0) throw new Error(`AUTH_CHECK: the revision check failed for ${mpq}`);
         return { body: rd(O, n), clientToken: u32at(SEED) };
