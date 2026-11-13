@@ -61,12 +61,43 @@ export function resolveUnitSound({ unitType, classId, soundEvent, isLocalPlayer 
 let linesText = null, linesMemo = null;
 const tableLines = (soundsTxt) => (soundsTxt === linesText ? linesMemo : (linesMemo = soundsTxt.split(/\r?\n/), linesText = soundsTxt, linesMemo));
 
-/** Map a row to its Sounds.txt line (name, file) given the table's text. */
+// The loader (D2Client 0x5DFD0) keeps every column in its 0x8E-byte record; the byte columns read as integers.
+const num = (v, d = 0) => { const n = Number(v); return v === undefined || v === '' || !Number.isFinite(n) ? d : n; };
+function parseRow(c, row, groupBase) {
+  return {
+    row, handle: c[0], file: c[2], volume: c[3] === undefined ? 255 : num(c[3]),
+    // Group Size 0 is stored as 1 (one variant).
+    groupSize: Math.max(1, num(c[4])), groupBase, loop: num(c[5]) === 1, fadeIn: num(c[6]), fadeOut: num(c[7]),
+    deferInst: num(c[8]) === 1, stopInst: num(c[9]) === 1, duration: num(c[10]), compound: num(c[11]),
+    reverb: num(c[12]) === 1, falloff: num(c[13]), cache: num(c[14]) === 1, asyncOnly: num(c[15]) === 1,
+    priority: num(c[16]), stream: num(c[17]) === 1,
+    stereo: num(c[18]) === 1, tracking: num(c[19]) === 1, solo: num(c[20]) === 1, music: num(c[21]) === 1,
+    blocks: [num(c[22]), num(c[23]), num(c[24])],
+  };
+}
+
+// The loader's group base (record +0x60): a row inside the span [g, g+size) opened by the last row with a
+// nonzero Group Size keeps g; every other row is its own base. The walk starts at data row 1.
+let basesText = null, basesMemo = null;
+function groupBase(soundsTxt, row) {
+  if (soundsTxt !== basesText) {
+    const lines = tableLines(soundsTxt), bases = new Int32Array(Math.max(0, lines.length - 1));
+    let g = 0, size = 0;
+    for (let r = 1; r < bases.length; r++) {
+      bases[r] = g !== 0 && r >= g && r < g + size ? g : r;
+      const s = num(lines[r + 1]?.split('\t')[4]);
+      if (s !== 0) { size = s; g = r; }
+    }
+    basesText = soundsTxt; basesMemo = bases;
+  }
+  return row > 0 && row < basesMemo.length ? basesMemo[row] : row;
+}
+
+/** Map a row to its Sounds.txt line (every column, plus the loader's group base) given the table's text. */
 export function soundRow(soundsTxt, row) {
   const line = tableLines(soundsTxt)[row + 1];
   if (!line) return null;
-  const c = line.split('\t');
-  return { row, handle: c[0], file: c[2], volume: c[3] === undefined ? 255 : Number(c[3]), stereo: Number(c[18] ?? 0) === 1, tracking: Number(c[19] ?? 0) === 1, music: Number(c[21] ?? 0) === 1 };
+  return parseRow(line.split('\t'), row, groupBase(soundsTxt, row));
 }
 
 /** Resolve a retail Sounds.txt handle (used by Speech.txt) to its indexed row and WAV path. */
@@ -76,7 +107,7 @@ export function soundRowByHandle(soundsTxt, handle) {
   for (let row = 1; row < lines.length; row++) {
     const c = lines[row].split('\t');
     if (c[0]?.toLowerCase() === String(handle).toLowerCase())
-      return { row: row - 1, handle: c[0], file: c[2], volume: c[3] === undefined ? 255 : Number(c[3]), stereo: Number(c[18] ?? 0) === 1, tracking: Number(c[19] ?? 0) === 1, music: Number(c[21] ?? 0) === 1 };
+      return parseRow(c, row - 1, groupBase(soundsTxt, row - 1));
   }
   return null;
 }
@@ -90,7 +121,7 @@ export function soundRowByFile(soundsTxt, file) {
   for (let row = 1; row < lines.length; row++) {
     const c = lines[row].split('\t');
     if (c[2]?.replaceAll('/', '\\').toLowerCase() === wanted)
-      matches.push({ row: row - 1, handle: c[0], file: c[2], volume: c[3] === undefined ? 255 : Number(c[3]), stereo: Number(c[18] ?? 0) === 1, tracking: Number(c[19] ?? 0) === 1, music: Number(c[21] ?? 0) === 1 });
+      matches.push(parseRow(c, row - 1, groupBase(soundsTxt, row - 1)));
   }
   if (matches.length > 1) throw new Error(`expected at most one Sounds.txt row for ${file}, found ${matches.length}`);
   return matches[0] ?? null;

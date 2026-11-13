@@ -1639,6 +1639,7 @@ function releaseRealmFlow({ closeTransports = true } = {}) {
   realmPlayerReassignFade.reset();
   realmWorldView = null;
   realmAreaAudio.reset();
+  unitSounds?.stopAll?.(); // no old scene's loops or pending footstep decodes after Save and Exit
   realmEventFeed = null;
   eventSounds?.resetObjects?.();
   realmLoadOrder.reset();
@@ -3059,7 +3060,7 @@ function drainUnitSounds() {
   unitSounds.updateSpatialGain(snapshot, listener);
   if (snapshot?.player) snapshot.player.castSkillId = readSelectedSkills()[castHand]; // the cast skill is the selected skill of the hand that last issued a command
   if (snapshot?.player && Module._d2_session_cast_refused_seq) { snapshot.player.castRefusedSeq = Module._d2_session_cast_refused_seq(); snapshot.player.castRefusedSkill = Module._d2_session_cast_refused_skill(); }
-  { const la = Module.ccall('d2_client_take_local_action', 'number', [], []); if (la === 2) eventSounds?.localWalk(snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0)?.classId); else if (la === 7) eventSounds?.localAttack(); }
+  { const la = Module.ccall('d2_client_take_local_action', 'number', [], []); if (la === 2) eventSounds?.localWalk(snapshot.player?.renderIdentity?.classId ?? snapshot.playerClass ?? snapshot?.entities?.find((e) => e.id === snapshot.playerId && e.type === 0)?.classId); else if (la === 7) eventSounds?.localAttack(); }
   if (snapshot?.player) { const m = session.motion(); Object.assign(snapshot.player, { mode: snapshot.mode, explicitMove: Module._d2_client_explicit_move(), framePrecise: m.framePrecise, frameCountPrecise: m.frameCountPrecise }); } // D1: footstep reads mode+frame
   if (snapshot && !clientView().fromPackets) snapshot.directHpLoss = Module._d2_session_shrine_hp_loss?.() === 1; // Storm shrine: hit points removed with no hit (a packet game reads the client's own shrine activations, realmShrineUse)
   // A game played through packets plays its sounds from the server's packets (the realm tick above); the engine's own
@@ -3086,10 +3087,11 @@ function drainUnitSounds() {
     const event = { unitType: v[i * 7], unitId: v[i * 7 + 1], classId: v[i * 7 + 2], soundEvent: v[i * 7 + 3], updateUnitType: v[i * 7 + 4], updateUnitId: v[i * 7 + 5], nativeSelectedRow: v[i * 7 + 6] };
     if (event.soundEvent === 0x10) event.monsterTaunt = event.nativeSelectedRow;
     if (event.soundEvent === 0x0c) event.skillStartSoundRow = event.nativeSelectedRow;
-    if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
-    if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
-    if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
-    if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
+    // The unit type and id attach the source to its unit: the mixer places it against the listener (Falloff, pan).
+    if (event.soundEvent === 0x100) { unitSounds.playRow(event.nativeSelectedRow, { source: 'monster-init', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x23170: MonSounds Init
+    if (event.soundEvent === 0x102) { unitSounds.playRow(event.nativeSelectedRow, { source: 'skill-dosound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0xA2C90: wDoSound
+    if (event.soundEvent === 0x103) { unitSounds.playRow(event.nativeSelectedRow, { source: 'shrine-state', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x24A70: shrine state sound
+    if (event.soundEvent === 0x101) { unitSounds.playRow(event.nativeSelectedRow, { source: 'state-onsound', unitType: event.unitType, unitId: event.unitId }).catch(() => {}); continue; } // D2Client+0x73760: States.txt onsound on a new state set
     const spatial = unitSoundNativeSpatial(event, snapshot, listener);
     event.nativeSpatialGainByte = spatial?.gainByte ?? null;
     event.nativeSpatialPanCode = spatial?.panCode ?? unitSoundNativePanCode(event, snapshot, listener);
@@ -4551,6 +4553,7 @@ function buildChromeSounds(fresh, read) {
   if (fresh || !uiClickSounds) { try { uiClickSounds = audioVolume.attach('sound', createUiClickSoundPlayer(assetReader, canvas)); } catch (error) { musicError = String(error); } }
   if (fresh || !(unitSounds && combatSounds && eventSounds && missileSounds && ambient)) {
     realmEventFeed = null;
+    unitSounds?.close(); // replace the old scene's mixer, including its queued decodes
     try { unitSounds = createUnitSoundPlayer(assetReader, undefined, undefined, soundFetched); combatSounds = createCombatSoundTrigger(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Combat sound', error)), () => unitSounds.monsterSoundBusy(), Module._d2_client_attack_roll_take); eventSounds = createEventSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Event sound', error)), (...a) => Number(Module._d2_client_monster_footstep_row(...a)), (c) => Number(Module._d2_client_monster_footstep_layer(c)), Module._d2_session_monster_idle_take ? (id) => Number(Module._d2_session_monster_idle_take(id)) >>> 0 : null, Module._d2_session_floor_class ? (type, id, fallback) => Number(Module._d2_session_floor_class(type, id, fallback)) : null, Module._d2_client_footstep_due); missileSounds = createMissileSounds(assetReader, (row, event) => unitSounds.playRow(row, event).catch((error) => console.warn('Missile sound', error)), (id) => !Module._d2_session_missile_on_client || Module._d2_session_missile_on_client(id) !== 0, (id) => (Module._d2_session_client_unit_roll ? Number(Module._d2_session_client_unit_roll(id)) >>> 0 : 0), (id) => { const f = Module._d2_session_missile_bolt_seed, lo = f ? Number(f(id, 0)) >>> 0 : 0, hi = f ? Number(f(id, 1)) >>> 0 : 0; return lo || hi ? [lo, hi] : null; }); canvas.__d2UnitSound = unitSounds; canvas.__d2EventSound = eventSounds; canvas.__d2MissileSound = missileSounds; audioVolume.attach('sound', unitSounds); ambient ??= audioVolume.attach('sound', createAmbientSound(assetReader, undefined, undefined, soundFetched)); } catch (error) { musicError = String(error); }
   }
 }

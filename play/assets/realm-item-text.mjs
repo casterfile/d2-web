@@ -264,6 +264,12 @@ export function createItemText({ tables, lang, heroStat = () => undefined }) {
         case 12: return pre('+', '') + body(v) + post('+', '');
         case 13: { const cs = chars.byClass(st.layer); return cs ? `+${v} ${key(cs.allSkills)}` : ''; }
         case 14: { const cs = chars.byClass((st.layer >> 3) & 3); return cs ? `${subst(key(cs.tabs[st.layer & 7] ?? ''), [v])} ${key(cs.classOnly)}` : ''; }
+        case 27: { // D2Client+0x54E10: value, localized "to", skill name, then the owning class's Only label.
+          const name = skills ? key(skills.nameKey(st.layer)) : '';
+          if (!v || !name) return '';
+          const cs = chars.byClass(skills.classId(st.layer)), sp = lang.index(3995) || ' ';
+          return `${v > 0 ? '+' : ''}${v}${sp}${lang.index(4003)}${sp}${name}${sp}${cs ? key(cs.classOnly) : ''}`;
+        }
         case 19: return subst(body(v), [v]);
         case 24: {
           const skill = st.layer >> 6, name = skills ? key(skills.nameKey(skill)) : '';
@@ -273,7 +279,7 @@ export function createItemText({ tables, lang, heroStat = () => undefined }) {
         }
         case 20: v = -v; return pre('', '%') + body(v) + post('', '%');
         case 21: v = -v; return pre('', '') + body(v) + post('', '');
-        default: return '';   // 11, 15-18, 22-23, 25-28: not worded (as single player)
+        default: return '';   // 11, 15-18, 22-23, 25-26, 28: not worded (as single player)
       }
     };
     const groups = new Map();

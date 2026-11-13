@@ -1,8 +1,8 @@
 // Footstep, item pickup/drop, gold and level-up sounds. Retail routes all of them through the D2Client sound
 // queue (FUN_6FB38A70). Rows: Sounds.txt by name; footsteps by the class group base at D2Client+0xF7694 word +0x28
 //: base + 4*(floor-1) for floor class 2..6 [+24 run]. The floor class is the engine's (D2Client 0x226A0 over the
-// live room tiles, floorClass(unitType, id, fallback)); the fallback is the level's SoundEnviron "Material 1". Limits: no
-// 4-row variant is drawn (combat-sound-trigger.mjs).
+// live room tiles, floorClass(unitType, id, fallback)); the fallback is the level's SoundEnviron "Material 1".
+// The sound mixer draws the row group's variants (sound-mixer-rules.mjs).
 const CVT_ROWS = [0, 251, 262, 268, 274, 280, 286, 292]; // D2Client+0xF5538 pair table, first of each pair, by hit class
 const GAIT_BASE = [2768, 2720, 2720, 2768, 2816, 2720, 2720]; // Ama Sor Nec Pal Bar Dru Asn
 import { OBJECT_MODE_SOUNDS, OBJECT_SELECT_SOUNDS, SHARED_ROW_CLASSES } from './object-mode-sounds.mjs';
@@ -61,7 +61,9 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
     noteServerPickup() { serverPickups++; },
     /** Per tick: snapshot.player (+ .motion), snapshot.items, and the hero's level. `remote` ({ cursorId, goldGained }) is a game read from packets: a ground item that leaves counts as the hero's pickup only when it is the item now on the cursor, or gold while the hero's gold rose (the server also removes items other players take or that leave the hero's range). */
     update(snapshot, heroLevel, remote = null) {
-      const p = snapshot?.player, m = p?.motion?.active ? p.motion : p, cls = p?.renderIdentity?.classId ?? p?.classId ?? snapshot?.entities?.find((e) => e.type === 0 && e.id === snapshot.playerId)?.classId;
+      // Packet snapshots carry the hero class at the top level, without a player
+      // entity. Preserve transformed identities, then use that authoritative class.
+      const p = snapshot?.player, m = p?.motion?.active ? p.motion : p, cls = p?.renderIdentity?.classId ?? p?.classId ?? snapshot?.playerClass ?? snapshot?.entities?.find((e) => e.type === 0 && e.id === snapshot.playerId)?.classId;
       if (Number.isInteger(snapshot?.level)) stepLevel = snapshot.level;
       const foot = (extra) => play((GAIT_BASE[cls] ?? 2768) + extra + floorOffset(0, 0), { kind: 'footstep', unitType: 0, classId: cls }); // 0x22FB0
       if (m && (m.mode === 2 || m.mode === 3 || m.mode === 6)) { // 6 = town walk (a retail recording: base row, no run footfall)
@@ -94,8 +96,12 @@ export function createEventSounds(read, play, monsterStep = null, monsterLayer =
         // A new path for a unit already walking (0x67/0x68 to the client) restarts its walk cycle at frame 0 in the tick it arrives: retail's 0x23C00
         // sees the restart (a retail recording: a raven re-pathed mid-walk skips the footfall its wrapped frame would have made), so no footfall that tick.
         if (!cut && prev[0] === a.mode && a.frameCountPrecise > 0 && (prev[1] + a.animSpeed) % a.frameCountPrecise !== a.framePrecise && a.framePrecise === a.animSpeed % a.frameCountPrecise) continue;
+        // Footfalls belong to a unit that walks: a walk/run-mode unit whose position did not change since last tick
+        // (a town NPC held in its walk mode while it stands) makes no footstep. Retail's unit leaves the walk mode when it stops.
+        if (!cut && (a.mode === 2 || a.mode === 0xF) && moved === 0) continue;
         const row = monsterStep(a.classId, cut ? 2 : a.mode, prev[1], cut ? prev[6] : a.frameCountPrecise, cut ? prev[7] : a.animSpeed, tick, lastStep.get(e.id) ?? 0, floorClass ? floorClass(1, e.id, levelMaterial(stepLevel)) : 0);
-        if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
+        // unitId attaches the footfall to the monster so the player places it against the listener (Falloff, pan).
+        if (row) { lastStep.set(e.id, tick); play(row, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); const layer = monsterLayer?.(a.classId); if (layer) play(layer, { kind: 'footstep', id: e.id, unitId: e.id, unitType: 1, classId: a.classId }); /* retail 0x88A70 submits the layer row on the same footfall (FsPrb 100) */ }
       }
       // D2Client 0x4F4A0 -> 0x237E0 (the idle/neutral sound) per client monster, in the unit table's order (bucket id & 0x7F, newest first); mode is 0x223D0's.
       if (monsterIdle) for (const e of (snapshot?.entities ?? []).filter((x) => x.type === 1 && x.animation?.inClientRoom).sort((p, q) => (p.id & 127) - (q.id & 127) || q.id - p.id)) {

@@ -28,7 +28,7 @@ export function unitSoundNativeSpatial(event, snapshot, listener) {
   return nativeUnitSoundSpatial(source, listener);
 }
 
-function unitSoundSourcePosition(event, snapshot) {
+export function unitSoundSourcePosition(event, snapshot) {
   if (!Number.isInteger(event?.unitType) || !Number.isInteger(event?.unitId)) return null;
   const sourceUnit = snapshot?.entities?.find((entity) => entity.type === event.unitType && entity.id === (event.unitId >>> 0));
   if (!sourceUnit) return null;

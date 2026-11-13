@@ -225,6 +225,7 @@ export function createSkillNameTable(read) {
   };
   return {
     nameKey(id) { load(); const desc = descs.get(skills.get(id)?.skilldesc); return desc?.['str name'] ?? ''; },
+    classId(id) { load(); return PLAYER_CLASS_NAME.findIndex((name) => name.slice(0, 3) === skills.get(id)?.charclass); },
     /** The skill's mana at a level in 1/256 units, as the hover plate reads it (D2Common 0x4EA00 with the plate's minmana floor); 0 for an unknown skill. */
     manaCost(id, level) {
       load();

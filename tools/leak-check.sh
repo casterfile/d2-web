@@ -8,6 +8,13 @@ cd "$(git rev-parse --show-toplevel)"
 mode="${1:---staged}"; rev="${2:-}"
 fail=0
 say() { echo "LEAK [$1]:"; sed 's/^/  /' | head -20; fail=1; }
+# Apple's Git regex backend does not recognize GNU \b. The scan needs the same
+# word boundary on macOS and Linux; every check only asks whether a match exists.
+portable_pattern() {
+  local p="${1#*|}"
+  p="${p/\\b/(^|[^[:alnum:]_])}"
+  printf '%s' "${p/\\b/($|[^[:alnum:]_])}"
+}
 
 # content patterns, shared by files and commit messages
 PATS=(
@@ -25,7 +32,7 @@ MSG_PATS=( "ai-trailer|^(Co-Authored-By|Claude-Session|Generated with)|claude\\.
 if [ "$mode" = --msg ]; then
   body="$(grep -v '^#' "$rev")"
   for p in "${PATS[@]}" "${MSG_PATS[@]}"; do
-    h="$(printf '%s\n' "$body" | grep -inE "${p#*|}")"; [ -n "$h" ] && say "message ${p%%|*}" <<< "$h"
+    h="$(printf '%s\n' "$body" | grep -inE "$(portable_pattern "$p")")"; [ -n "$h" ] && say "message ${p%%|*}" <<< "$h"
   done
   [ "$fail" = 0 ] || { echo "leak-check: commit message refused" >&2; exit 1; }; exit 0
 fi
@@ -48,9 +55,11 @@ h=$(printf '%s\n' "$files" | grep -iE '\.(png|jpg)$' | grep -vE '^docs/screensho
 # the private paths on purpose
 for p in "${PATS[@]}"; do
   if [ "$mode" = --all ]; then
-    h=$(git grep "${opt[@]}" -I -nE "${p#*|}" "${src[@]}" -- . ':!tools/leak-check.sh' ':!.gitignore' 2>/dev/null)
+    # macOS Bash 3.2 treats an empty array as unset under nounset. Expand only
+    # populated arrays so the actual content scan still runs on that shell.
+    h=$(git grep ${opt[@]+"${opt[@]}"} -I -nE "$(portable_pattern "$p")" ${src[@]+"${src[@]}"} -- . ':!tools/leak-check.sh' ':!.gitignore' 2>/dev/null)
   else
-    h=$(printf '%s\0' $files | xargs -0 git grep "${opt[@]}" -I -nE "${p#*|}" "${src[@]}" -- ':!tools/leak-check.sh' ':!.gitignore' 2>/dev/null)
+    h=$(printf '%s\0' $files | xargs -0 git grep ${opt[@]+"${opt[@]}"} -I -nE "$(portable_pattern "$p")" ${src[@]+"${src[@]}"} -- ':!tools/leak-check.sh' ':!.gitignore' 2>/dev/null)
   fi
   [ -n "$h" ] && say "${p%%|*}" <<< "$h"
 done
