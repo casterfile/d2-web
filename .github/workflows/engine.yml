@@ -26,8 +26,10 @@ jobs:
         run: |
           set -euo pipefail
           docker build -f Dockerfile.builder64 -t d2-builder64 .
-          toolchain=$(docker image inspect d2-builder64 --format '{{.Id}}')
-          docker run --rm -v "$PWD:/build" -e D2_COMPILE_JOBS=2 -e D2_TOOLCHAIN_ID="$toolchain" d2-builder64 bash wasm-build/link-d2.sh
+          # The builder's default hashes the actual installed compiler/sysroot.
+          # An image's creation ID changes between hosted runners despite equal
+          # compiler bytes, needlessly invalidating every cached native object.
+          docker run --rm -v "$PWD:/build" -e D2_COMPILE_JOBS=2 d2-builder64 bash wasm-build/link-d2.sh
           node tools/engine-artifact-manifest.mjs
       # Retain successful object compilations even if another source or the link
       # fails; the canonical builder revalidates every dependency by content.
