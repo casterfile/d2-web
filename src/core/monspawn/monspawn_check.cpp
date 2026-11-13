@@ -9320,10 +9320,6 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item(uint32_t itemUnitId) {
     return result == 0 ? 1 : 0;
 }
 
-// The client's second half of an item spell: 0x27 UseItemAction {target item, use item}. Identify's scroll or
-// tome arms targeting on the 0x20 above (IFLAG_TARGETING); the next left click on an item sends this, and the
-// same id twice (or no target) is the client cancelling. D2Game+0x6FC85B50 -> sub_6FC47470 decide everything:
-// the identify, the tome charge or scroll consumed, and clearing the flag. 1 if the handler accepted.
 // Upstream 3cc5f793: belt items use the 0x26 handler, rather than the pack's 0x20.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt_item(uint32_t itemUnitId, uint32_t onMerc) {
     if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
@@ -9335,6 +9331,10 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt_item(uint32_t itemUnitId, u
     updateSessionSnapshot();
     return result == 0 ? 1 : 0;
 }
+// The client's second half of an item spell: 0x27 UseItemAction {target item, use item}. Identify's scroll or
+// tome arms targeting on the 0x20 above (IFLAG_TARGETING); the next left click on an item sends this, and the
+// same id twice (or no target) is the client cancelling. D2Game+0x6FC85B50 -> sub_6FC47470 decide everything:
+// the identify, the tome charge or scroll consumed, and clearing the flag. 1 if the handler accepted.
 EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item_action(uint32_t targetItemId, uint32_t useItemId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
     uint8_t packet[9] = { 0x27 };

@@ -15,6 +15,7 @@ jobs:
         with:
           node-version: 24
       - uses: actions/cache@v4
+        id: objects
         with:
           path: |
             build-wasm/obj
@@ -28,6 +29,15 @@ jobs:
           toolchain=$(docker image inspect d2-builder64 --format '{{.Id}}')
           docker run --rm -v "$PWD:/build" -e D2_COMPILE_JOBS=2 -e D2_TOOLCHAIN_ID="$toolchain" d2-builder64 bash wasm-build/link-d2.sh
           node tools/engine-artifact-manifest.mjs
+      # Retain successful object compilations even if another source or the link
+      # fails; the canonical builder revalidates every dependency by content.
+      - uses: actions/cache/save@v4
+        if: failure() && steps.objects.outputs.cache-hit != 'true'
+        with:
+          path: |
+            build-wasm/obj
+            build-wasm/stormlib-wasm64
+          key: wasm64-${{ runner.os }}-${{ hashFiles('Dockerfile.builder64', 'tools/compiler-cache.sh') }}-${{ github.sha }}
       - uses: actions/upload-artifact@v4
         with:
           name: wasm-engine
