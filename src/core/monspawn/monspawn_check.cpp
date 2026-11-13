@@ -2597,6 +2597,13 @@ EMSCRIPTEN_KEEPALIVE int d2_session_client_skills() {
     }
     return 1;
 }
+// Upstream 3cc5f793: starting and loaded items are placed after the join burst
+// was captured. Publish the real held inventory through its original serializer.
+EMSCRIPTEN_KEEPALIVE int d2_session_client_items() {
+    if (!g_targetClient || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    PLAYER_SynchronizeItemsToClient(g_targetPlayer, g_targetClient);
+    return 1;
+}
 EMSCRIPTEN_KEEPALIVE const uint8_t* d2_session_join_stream(uint32_t* length) { if (length) *length = (uint32_t)g_sessionJoinBurst.size(); return g_sessionJoinBurst.data(); }
 // The rooms the game holds its client in, as the 6-byte room reveals {0x07, tile x, tile y, level} a joining
 // client is sent: the client's own room first, then the rest of its adjacent list. Returns the byte count.
@@ -9317,6 +9324,17 @@ EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item(uint32_t itemUnitId) {
 // tome arms targeting on the 0x20 above (IFLAG_TARGETING); the next left click on an item sends this, and the
 // same id twice (or no target) is the client cancelling. D2Game+0x6FC85B50 -> sub_6FC47470 decide everything:
 // the identify, the tome charge or scroll consumed, and clearing the flag. 1 if the handler accepted.
+// Upstream 3cc5f793: belt items use the 0x26 handler, rather than the pack's 0x20.
+EMSCRIPTEN_KEEPALIVE int d2_session_command_use_belt_item(uint32_t itemUnitId, uint32_t onMerc) {
+    if (!g_sessionLive || !g_game || !g_targetPlayer || !g_targetPlayer->pInventory) return 0;
+    uint8_t packet[13] = { 0x26 };
+    const int32_t id = (int32_t)itemUnitId, merc = onMerc ? 1 : 0;
+    memcpy(packet + 1, &id, 4); memcpy(packet + 5, &merc, 4);
+    if (!sessionDispatchGate(0x26)) return 0;
+    const int32_t result = D2GAME_PACKETCALLBACK_Rcv0x26_UseBeltItem_6FC86150(g_game, g_targetPlayer, packet, sizeof packet);
+    updateSessionSnapshot();
+    return result == 0 ? 1 : 0;
+}
 EMSCRIPTEN_KEEPALIVE int d2_session_command_use_item_action(uint32_t targetItemId, uint32_t useItemId) {
     if (!g_sessionLive || !g_game || !g_targetPlayer) return 0;
     uint8_t packet[9] = { 0x27 };

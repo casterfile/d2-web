@@ -1,0 +1,39 @@
+name: engine
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/cache@v4
+        with:
+          path: |
+            build-wasm/obj
+            build-wasm/stormlib-wasm64
+          key: wasm64-${{ runner.os }}-${{ hashFiles('Dockerfile.builder64', 'tools/compiler-cache.sh') }}-${{ github.sha }}
+          restore-keys: wasm64-${{ runner.os }}-${{ hashFiles('Dockerfile.builder64', 'tools/compiler-cache.sh') }}-
+      - name: Build the existing WASM engine without game archives
+        run: |
+          set -euo pipefail
+          docker build -f Dockerfile.builder64 -t d2-builder64 .
+          toolchain=$(docker image inspect d2-builder64 --format '{{.Id}}')
+          docker run --rm -v "$PWD:/build" -e D2_COMPILE_JOBS=2 -e D2_TOOLCHAIN_ID="$toolchain" d2-builder64 bash wasm-build/link-d2.sh
+          node tools/engine-artifact-manifest.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wasm-engine
+          path: |
+            play/d2.js
+            play/d2.wasm
+            play/engine-artifact.json
+          if-no-files-found: error
+          retention-days: 30

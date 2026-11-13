@@ -28,6 +28,7 @@ int d2_session_command_insert_item_packet(uint32_t itemId, uint32_t x, uint32_t 
 int d2_session_command_item_to_cursor_packet(uint32_t itemId);
 int d2_session_command_equip_packet(uint32_t itemId, uint32_t bodyLoc);
 int d2_session_command_use_item(uint32_t itemUnitId);
+int d2_session_command_use_belt_item(uint32_t itemUnitId, uint32_t onMerc);
 int d2_session_command_use_item_action(uint32_t targetItemId, uint32_t useItemId);
 int d2_session_command_add_stat(uint32_t statId, uint32_t count);
 int d2_session_command_dropgold(uint32_t amount);
@@ -47,6 +48,7 @@ const uint8_t* d2_session_join_stream(uint32_t* length);
 uint32_t d2_session_join_load_length();
 int d2_session_client_spawned();
 int d2_session_client_skills();
+int d2_session_client_items();
 int d2_session_client_rooms(uint8_t* out, int capacity);
 uint32_t d2_session_game_seed();
 int d2_session_game_flags();
@@ -137,6 +139,7 @@ bool sendPlayer() {
     const uint32_t load = d2_session_join_load_length();
     if (join && load <= burst) put(join + load, static_cast<int>(burst - load));
     g_server.phase = Phase::InGame;     // the sink forwards from here on
+    d2_session_client_items();          // actual worn, pack and belt items precede their granted skills
     d2_session_client_skills();         // skill list and both hands' selection, through the sink
     // The room join already sent each unit of those rooms (objects included) into the kept join bytes above; no second pass.
     return true;
@@ -159,7 +162,7 @@ int dispatch(const uint8_t* p, int n) {
     case 0x19: if (!need(5)) return -1; return d2_session_command_item_to_cursor_packet(rd32(p + 1));
     case 0x1A: if (!need(9)) return -1; return d2_session_command_equip_packet(rd32(p + 1), rd32(p + 5));
     case 0x20: if (!need(13)) return -1; return d2_session_command_use_item(rd32(p + 1));
-    case 0x26: if (!need(13)) return -1; return d2_session_command_use_item(rd32(p + 1));
+    case 0x26: if (!need(13)) return -1; return d2_session_command_use_belt_item(rd32(p + 1), rd32(p + 5));
     case 0x27: if (!need(9)) return -1; return d2_session_command_use_item_action(rd32(p + 1), rd32(p + 5));   // [target item][armed item]: D2Game's UseItemAction handler (D2MOO D2Game 0x6FC85B50 -> sub_6FC47470), the identify cursor's press and its cancel
     case 0x30: if (!need(9)) return -1; return d2_session_command_end_npc(rd32(p + 5));
     case 0x31: if (!need(9)) return -1; return d2_session_command_npc_response_packet(rd32(p + 1), rd32(p + 5));
