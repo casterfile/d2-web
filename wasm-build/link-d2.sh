@@ -65,7 +65,11 @@ fi
 # -fwrapv: signed overflow wraps, like the x86-32 MSVC build the logic came from.
 # No -flto (openmw-web: wasm-ld miscompiles under it). `-m64` selects full end-to-end Memory64.
 . "$(dirname "$0")/probe-skip.sh"
-SRCS=$(find src -name '*.cpp' ! -name '*.test.cpp' | sort)
+# B33B0 is a standalone disassembly diagnostic: no browser caller or export
+# references d2_fn_d2game_B33B0. Its fixed weak Ord imports collide with other
+# standalone seams' variadic imports (some are different routines altogether).
+# Preserve that source for its native probe; do not link it into the game.
+SRCS=$(find src -name '*.cpp' ! -name '*.test.cpp' ! -path 'src/core/d2game/d2game_b33b0.cpp' | sort)
 # tools/vectorfmt is shared with the Win32 capture tool: same header, same hash, no drift.
 echo "==> em++ $(echo $SRCS | wc -w) sources"
 # src/core/d2moo is vendored D2MOO (MIT, 1.10f prose map) compiled as 1.13c through the
